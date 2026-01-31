@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { loadHistory, saveHistory } from '@/utils/storage';
-import { exportToGemini, exportHandToGemini } from '@/utils/gemini';
+import { exportToGemini, generateHandExport } from '@/utils/gemini';
 import { calculateCurrentPot } from '@/utils/potUtils';
 import type { Hand, ActionRecord } from '@/types/poker';
 
@@ -57,9 +57,17 @@ export default function HistoryPage() {
   const [filterFav, setFilterFav] = useState(false);
   const [editingMemoId, setEditingMemoId] = useState<string | null>(null);
   const [memoText, setMemoText] = useState('');
+  const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
     setHistory(loadHistory());
+  }, []);
+
+  // BUG-10: タブ切替時にlocalStorageから再読み込み
+  useEffect(() => {
+    const handler = () => setHistory(loadHistory());
+    window.addEventListener('refreshHistory', handler);
+    return () => window.removeEventListener('refreshHistory', handler);
   }, []);
 
   const sorted = [...history].sort((a, b) => b.date - a.date);
@@ -95,6 +103,33 @@ export default function HistoryPage() {
   const saveMemo = (id: string) => {
     updateHand(id, { memo: memoText || undefined });
     setEditingMemoId(null);
+  };
+
+  // BUG-11: Copy & Gem（clipboard fallback + Gemini起動 + トースト）
+  const copyAndGem = async (hand: Hand) => {
+    const text = generateHandExport(hand);
+    // window.openを先に実行（ユーザージェスチャ内でないとポップアップブロックされる）
+    window.open('https://gemini.google.com/app', '_blank');
+    // クリップボードにコピー
+    let copied = false;
+    try {
+      await navigator.clipboard.writeText(text);
+      copied = true;
+    } catch {
+      // フォールバック: textarea + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      copied = document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    if (copied) {
+      setToast('Copied! Paste in Gemini to analyze');
+      setTimeout(() => setToast(null), 3000);
+    }
   };
 
   return (
@@ -339,7 +374,7 @@ export default function HistoryPage() {
                             className="px-3 py-1 bg-p5-red text-white font-bold text-xs border border-white/30"
                             style={{ clipPath: 'polygon(4% 0%, 100% 0%, 96% 100%, 0% 100%)' }}
                             whileTap={{ scale: 0.95 }}
-                            onClick={() => exportHandToGemini(hand)}
+                            onClick={() => copyAndGem(hand)}
                           >
                             <span className="font-p5-en">Copy & Gem</span>
                           </motion.button>
@@ -353,6 +388,22 @@ export default function HistoryPage() {
           </div>
         )}
       </div>
+
+      {/* Toast notification */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            className="fixed bottom-6 left-1/2 z-50 px-6 py-3 bg-p5-red text-white font-bold text-sm border border-white/30"
+            style={{ clipPath: 'polygon(3% 0%, 100% 0%, 97% 100%, 0% 100%)', transform: 'translateX(-50%)' }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            transition={{ duration: 0.2 }}
+          >
+            <span className="font-p5-en">{toast}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </main>
   );
 }

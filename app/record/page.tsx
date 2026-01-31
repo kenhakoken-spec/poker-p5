@@ -453,7 +453,7 @@ export default function RecordPage() {
   if (step === 'start') {
     const titleText = 'ハンド記録開始';
     return (
-      <main className="min-h-screen max-h-screen overflow-hidden bg-black text-white p-4 flex flex-col items-center justify-center">
+      <main className="h-full overflow-hidden bg-black text-white p-4 flex flex-col items-center justify-center">
         <div className="flex justify-center flex-wrap gap-0.5 mb-3">
           {titleText.split('').map((char, i) => (
             <motion.span
@@ -488,7 +488,8 @@ export default function RecordPage() {
   }
 
   if (step === 'preflopWhoOpen') {
-    const order: Position[] = ['UTG', 'MP', 'CO', 'BTN', 'SB', 'BB'];
+    // UI-18: BBはプリフロップでオープンレイズ不可のため除外
+    const order: Position[] = ['UTG', 'MP', 'CO', 'BTN', 'SB'];
     const openerForSheet = whoOpenSelectedPosition;
     const stackForOpener = openerForSheet
       ? (gameState?.players.find((p) => p.position === openerForSheet)?.stack ?? 100)
@@ -496,8 +497,8 @@ export default function RecordPage() {
     const openSizes = openerForSheet ? getPreflopBetSizes(stackForOpener, undefined) : [];
 
     return (
-      <main className="min-h-screen max-h-screen overflow-hidden bg-black text-white flex flex-col relative">
-        <div className="shrink-0 px-3 pt-4 pb-2 border-b border-white/20">
+      <main className="h-full overflow-hidden bg-black text-white flex flex-col relative">
+        <div className="shrink-0 px-3 pt-2 pb-1 border-b border-white/20">
           <motion.h2
             className="font-p5-en text-lg font-black whitespace-nowrap"
             style={{ transform: 'skewX(-7deg)' }}
@@ -556,7 +557,7 @@ export default function RecordPage() {
                 <div className="flex flex-col gap-2">
                   <motion.button
                     type="button"
-                    className="w-full py-4 border-2 border-white font-black polygon-button bg-black text-white"
+                    className="w-full py-3 border-2 border-white font-black polygon-button bg-black text-white"
                     style={{ transform: 'skewX(-7deg)' }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => handlePreflopWhoOpenConfirm(openerForSheet, 'call')}
@@ -567,7 +568,7 @@ export default function RecordPage() {
                     <motion.button
                       key={s.amount ?? 0}
                       type="button"
-                      className="w-full py-4 border-2 border-white font-black polygon-button bg-black text-white"
+                      className="w-full py-3 border-2 border-white font-black polygon-button bg-black text-white"
                       style={{ transform: 'skewX(-7deg)' }}
                       whileTap={{ scale: 0.95 }}
                       onClick={() => handlePreflopWhoOpenConfirm(openerForSheet, s)}
@@ -577,7 +578,7 @@ export default function RecordPage() {
                   ))}
                   <motion.button
                     type="button"
-                    className="w-full py-4 border-2 border-p5-red font-black polygon-button bg-p5-red text-white"
+                    className="w-full py-3 border-2 border-p5-red font-black polygon-button bg-p5-red text-white"
                     style={{ transform: 'skewX(-7deg)' }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => handlePreflopWhoOpenConfirm(openerForSheet, 'all-in')}
@@ -639,8 +640,8 @@ export default function RecordPage() {
 
     if (preflopNextToAct === null) {
       return (
-        <main className="min-h-screen max-h-screen overflow-hidden bg-black text-white flex flex-col">
-          <div className="shrink-0 px-3 pt-4 pb-2 border-b border-white/20">
+        <main className="h-full overflow-hidden bg-black text-white flex flex-col">
+          <div className="shrink-0 px-3 pt-2 pb-1 border-b border-white/20">
             <motion.h2
               className="font-p5-en text-lg font-black whitespace-nowrap"
               style={{ transform: 'skewX(-7deg)' }}
@@ -688,8 +689,8 @@ export default function RecordPage() {
     const raiseSizes = getPreflopBetSizes(stack, lastBet).filter((s) => s.amount && (s.amount ?? 0) > (lastBet ?? 0));
 
     return (
-      <main className="min-h-screen max-h-screen overflow-hidden bg-black text-white flex flex-col">
-        <div className="shrink-0 px-3 pt-4 pb-2 border-b border-white/20">
+      <main className="h-full overflow-hidden bg-black text-white flex flex-col">
+        <div className="shrink-0 px-3 pt-2 pb-1 border-b border-white/20">
           <motion.h2
             className="font-p5-en text-lg font-black"
             style={{ transform: 'skewX(-7deg)' }}
@@ -700,10 +701,10 @@ export default function RecordPage() {
           </motion.h2>
           <p className="text-[10px] text-gray-400 mt-0.5">Call, Raise 2x/3x, or All-in</p>
         </div>
-        <div className="flex-1 min-h-0 p-4 flex flex-col justify-center gap-2 overflow-auto">
+        <div className="flex-1 min-h-0 p-3 flex flex-col justify-center gap-2 overflow-auto">
           <motion.button
             type="button"
-            className="w-full py-4 border-2 border-white font-black text-lg polygon-button bg-black text-white"
+            className="w-full py-3 border-2 border-white font-black text-base polygon-button bg-black text-white"
             style={{ transform: 'skewX(-7deg)' }}
             whileTap={{ scale: 0.95 }}
             onClick={() => handlePreflopOpponentsConfirm(preflopNextToAct, 'call')}
@@ -714,7 +715,7 @@ export default function RecordPage() {
             <motion.button
               key={s.amount ?? 0}
               type="button"
-              className="w-full py-4 border-2 border-white font-black text-lg polygon-button bg-black text-white"
+              className="w-full py-3 border-2 border-white font-black text-base polygon-button bg-black text-white"
               style={{ transform: 'skewX(-7deg)' }}
               whileTap={{ scale: 0.95 }}
               onClick={() => handlePreflopOpponentsConfirm(preflopNextToAct, 'raise', s)}
@@ -724,7 +725,7 @@ export default function RecordPage() {
           ))}
           <motion.button
             type="button"
-            className="w-full py-4 border-2 border-p5-red font-black text-lg polygon-button bg-p5-red text-white"
+            className="w-full py-3 border-2 border-p5-red font-black text-base polygon-button bg-p5-red text-white"
             style={{ transform: 'skewX(-7deg)' }}
             whileTap={{ scale: 0.95 }}
             onClick={() => handlePreflopOpponentsConfirm(preflopNextToAct, 'all-in')}
@@ -746,7 +747,7 @@ export default function RecordPage() {
       : [];
     
     return (
-      <main className="min-h-screen max-h-screen overflow-hidden bg-black text-white flex flex-col">
+      <main className="h-full overflow-hidden bg-black text-white flex flex-col">
         <div className="p-1.5 border-b border-white/20 flex flex-wrap items-center justify-between gap-1 shrink-0 bg-black/80">
           <PotDisplay compact />
           <div className="flex items-center gap-2 flex-wrap">
@@ -771,7 +772,7 @@ export default function RecordPage() {
 
   if (step === 'winner') {
     return (
-      <main className="min-h-screen max-h-screen overflow-hidden bg-black text-white flex flex-col items-center justify-center p-4 relative">
+      <main className="h-full overflow-hidden bg-black text-white flex flex-col items-center justify-center p-4 relative">
         {/* A5: サイドポット対応勝者選択 */}
         {gameState?.sidePots && gameState.sidePots.length > 1 ? (
           <>
@@ -831,7 +832,7 @@ export default function RecordPage() {
           </>
         ) : (
           <>
-            <h2 className="text-2xl sm:text-3xl font-black text-center mb-6" style={{ transform: 'skewX(-7deg)' }}>
+            <h2 className="text-2xl sm:text-3xl font-black text-center mb-4" style={{ transform: 'skewX(-7deg)' }}>
               勝者は？
             </h2>
             <div className="flex flex-wrap justify-center gap-3 max-w-sm">
@@ -987,7 +988,7 @@ export default function RecordPage() {
     const displayAmount = Math.round(heroProfit * 10) / 10;
 
     return (
-      <main className="min-h-screen max-h-screen overflow-hidden bg-black text-white p-4 flex flex-col items-center justify-center relative overflow-hidden">
+      <main className="h-full overflow-hidden bg-black text-white p-4 flex flex-col items-center justify-center relative">
         {/* 背景演出 */}
         <motion.div
           className="absolute inset-0 pointer-events-none"
@@ -1014,7 +1015,7 @@ export default function RecordPage() {
         />
 
         <motion.h1
-          className={`font-p5-en text-5xl sm:text-7xl font-black mb-4 text-center relative z-10 ${heroWon ? 'glow-red-text' : ''}`}
+          className={`font-p5-en text-5xl sm:text-7xl font-black mb-3 text-center relative z-10 ${heroWon ? 'glow-red-text' : ''}`}
           style={{
             transform: 'skewX(-7deg)',
             color: heroWon ? '#D50000' : '#fff',
@@ -1028,7 +1029,7 @@ export default function RecordPage() {
         </motion.h1>
 
         <motion.p
-          className={`font-p5-en text-3xl sm:text-5xl font-black mb-8 text-center relative z-10 ${heroWon ? 'text-white' : 'text-gray-400'}`}
+          className={`font-p5-en text-3xl sm:text-5xl font-black mb-4 text-center relative z-10 ${heroWon ? 'text-white' : 'text-gray-400'}`}
           style={{
             transform: 'skewX(-5deg)',
             textShadow: heroWon ? '0 0 15px rgba(213,0,0,0.4)' : 'none',
@@ -1042,14 +1043,14 @@ export default function RecordPage() {
 
         {/* UI-6: メモ入力 */}
         <motion.div
-          className="w-full max-w-xs relative z-10 mb-4"
+          className="w-full max-w-xs relative z-10 mb-3"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.45 }}
         >
           <textarea
             className="w-full bg-black border-2 border-p5-red/60 text-white text-sm p-3 rounded resize-none focus:border-p5-red focus:outline-none placeholder-gray-500"
-            rows={3}
+            rows={2}
             placeholder="メモ（場所、相手の特徴、思考プロセスなど）"
             value={memo}
             onChange={(e) => setMemo(e.target.value)}
@@ -1085,7 +1086,7 @@ export default function RecordPage() {
   };
 
   return (
-    <main className="min-h-screen max-h-screen overflow-hidden bg-black text-white flex flex-col relative">
+    <main className="h-full overflow-hidden bg-black text-white flex flex-col relative">
       {/* B6: ストリート遷移バナー */}
       <AnimatePresence>
         {streetBanner && (
@@ -1118,7 +1119,7 @@ export default function RecordPage() {
       </AnimatePresence>
 
       {/* B13: ヘッダー帯 + B10: ヒーロープレミアム */}
-      <div className="p-2 sm:p-3 border-b border-white/20 shrink-0 bg-black/80 space-y-2 header-sweep-bg">
+      <div className="p-2 sm:p-3 border-b border-white/20 shrink-0 bg-black/80 space-y-1 header-sweep-bg">
         <div className="flex flex-wrap items-center justify-between gap-1">
           <PotDisplay compact />
           <span className="font-p5-en text-base sm:text-lg font-black text-p5-red glow-red-text" style={{ transform: 'skewX(-5deg)' }}>
@@ -1196,7 +1197,7 @@ export default function RecordPage() {
       {/* ボードカード表示 */}
       {board.length > 0 && (step === 'position' || step === 'action') && (
         <motion.div
-          className="shrink-0 px-3 py-2 border-b border-white/10 bg-black/60"
+          className="shrink-0 px-3 py-1.5 border-b border-white/10 bg-black/60"
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ type: 'spring', stiffness: 300, damping: 20 }}
@@ -1232,7 +1233,7 @@ export default function RecordPage() {
       <AnimatePresence mode="wait">
         <motion.div
           key={step + (selectedPosition ?? '')}
-          className="flex-1 min-h-0 overflow-hidden p-4 flex flex-col justify-center"
+          className="flex-1 min-h-0 overflow-hidden p-3 flex flex-col justify-center"
           initial={{ clipPath: 'polygon(100% 100%, 100% 100%, 100% 100%, 100% 100%)', opacity: 0 }}
           animate={{ clipPath: 'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)', opacity: 1 }}
           exit={{ clipPath: 'polygon(0% 0%, 0% 0%, 0% 0%, 0% 0%)', opacity: 0 }}
@@ -1243,7 +1244,7 @@ export default function RecordPage() {
               <h2 className="font-p5-en text-xl sm:text-2xl font-black mb-2 text-center glow-red-text" style={{ transform: 'skewX(-5deg)' }}>
                 SELECT POSITION
               </h2>
-              <p className="font-p5-en text-sm text-gray-400 text-center mb-4">
+              <p className="font-p5-en text-sm text-gray-400 text-center mb-2">
                 {nextToAct ? `${nextToAct} ACTION` : 'NEXT STREET'}
               </p>
               <div className="flex-1 min-h-0 flex flex-col justify-center">
@@ -1254,7 +1255,7 @@ export default function RecordPage() {
                 />
               </div>
               {nextToAct && (
-                <div className="flex justify-center mt-4">
+                <div className="flex justify-center mt-2">
                   <P5Button
                     className="px-6 py-3 bg-p5-red/80 text-white font-p5-en text-sm font-bold glow-red"
                     style={{ transform: 'skewX(-5deg)' }}

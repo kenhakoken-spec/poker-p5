@@ -46,7 +46,12 @@ export default function Home() {
                 : 'text-gray-500 hover:text-gray-300'
             }`}
             style={{ height: '48px' }}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => {
+              setActiveTab(tab.id);
+              if (tab.id === 'history') {
+                window.dispatchEvent(new CustomEvent('refreshHistory'));
+              }
+            }}
           >
             <span style={{ display: 'inline-block', transform: 'skewX(-7deg)' }}>
               {tab.label}
