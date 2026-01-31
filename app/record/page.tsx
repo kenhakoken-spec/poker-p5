@@ -15,8 +15,6 @@ import PotDisplay from '@/components/poker/PotDisplay';
 import ActionHistory from '@/components/poker/ActionHistory';
 import BoardSelector from '@/components/poker/BoardSelector';
 import SuitBasedCardReel from '@/components/poker/SuitBasedCardReel';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 
 type Step =
   | 'start'
@@ -99,7 +97,6 @@ export default function RecordPage() {
   const [confirmedPotWinners, setConfirmedPotWinners] = useState<PotWinner[]>([]);
   /** UI-6: メモ */
   const [memo, setMemo] = useState('');
-  const router = useRouter();
 
   const activePlayers = gameState ? getActivePlayers(gameState.players) : [];
   const actingPlayers = gameState ? getActingPlayers(gameState.players) : [];
@@ -134,20 +131,22 @@ export default function RecordPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameState?.street]);
 
-  // ストリート進行後にボード選択が必要か（nextToAct が null = ラウンド閉鎖済み）
+  // BUG-8: ボード選択判定をboardLengthベースに（ランアウト時のストリート不整合を解消）
   useEffect(() => {
     if (!gameState || step !== 'position') return;
-    if (gameState.street === 'flop' && boardLength < 3) {
+    // プリフロップ中（street未進行）はボード選択不要
+    if (gameState.street === 'preflop') return;
+    if (boardLength < 3) {
       setPendingBoardStreet('flop');
       setStep('selectBoard');
       return;
     }
-    if (gameState.street === 'turn' && boardLength < 4) {
+    if (boardLength < 4) {
       setPendingBoardStreet('turn');
       setStep('selectBoard');
       return;
     }
-    if (gameState.street === 'river' && boardLength < 5) {
+    if (boardLength < 5) {
       setPendingBoardStreet('river');
       setStep('selectBoard');
       return;
@@ -168,6 +167,17 @@ export default function RecordPage() {
       setStep('winner');
     }
   }, [gameState, step, boardLength, nextToAct, activePlayers, allPlayersAllIn]);
+
+  // UI-10: nextToAct確定時はポジション選択をスキップして直接アクションへ
+  useEffect(() => {
+    if (step !== 'position' || !nextToAct || !gameState) return;
+    // ボード選択が必要な場合はスキップしない
+    if (gameState.street === 'flop' && boardLength < 3) return;
+    if (gameState.street === 'turn' && boardLength < 4) return;
+    if (gameState.street === 'river' && boardLength < 5) return;
+    setSelectedPosition(nextToAct);
+    setStep('action');
+  }, [step, nextToAct, gameState, boardLength]);
 
   // プリフロップ対向者: まだアクションしていないポジションがなければ position へ
   useEffect(() => {
@@ -339,6 +349,9 @@ export default function RecordPage() {
 
   const handleBoardConfirm = (cards: string[]) => {
     if (!pendingBoardStreet || !gameState) return;
+    // UI-11: カード枚数バリデーション（フロップ3枚/ターン・リバー1枚）
+    const requiredCount = pendingBoardStreet === 'flop' ? 3 : 1;
+    if (cards.length !== requiredCount) return;
     setBoardCards(pendingBoardStreet, cards);
     setPendingBoardStreet(null);
 
@@ -412,10 +425,24 @@ export default function RecordPage() {
 
   const handleFinish = (won: boolean, dynamicAmount?: number) => {
     const amount = dynamicAmount ?? (won ? 10 : -10);
-    // UI-6: memo を含めて保存（Hand型にmemo追加後はas assertion不要）
-    const result = { won, amount, ...(memo ? { memo } : {}) };
-    finishHand(result as { won: boolean; amount: number });
-    router.push('/history');
+    finishHand({ won, amount });
+    // UI-12: memo をハンドのトップレベルフィールドとして localStorage に直接保存
+    if (memo) {
+      try {
+        const raw = localStorage.getItem('poker3_history');
+        if (raw) {
+          const hands = JSON.parse(raw);
+          if (hands.length > 0) {
+            hands[hands.length - 1].memo = memo;
+            localStorage.setItem('poker3_history', JSON.stringify(hands));
+          }
+        }
+      } catch {
+        // memo保存失敗（ハンド本体は保存済み）
+      }
+    }
+    // BUG-7: タブ切替でヒストリーに遷移（router.pushだとタブナビから外れる）
+    window.dispatchEvent(new CustomEvent('switchTab', { detail: 'history' }));
   };
 
   const usedCardsForBoard = [
@@ -499,10 +526,6 @@ export default function RecordPage() {
             );
           })}
         </div>
-        <div className="shrink-0 p-2 text-center border-t border-white/10">
-          <Link href="/" className="text-p5-red text-xs font-bold">← TOP</Link>
-        </div>
-
         {/* ボトムシート: オープンサイズ（2x / 3x / All-in）・半透明オーバーレイ */}
         <AnimatePresence>
           {openerForSheet && (
@@ -655,9 +678,6 @@ export default function RecordPage() {
               );
             })}
           </div>
-          <div className="shrink-0 p-2 text-center">
-            <Link href="/" className="text-p5-red text-xs font-bold">← TOP</Link>
-          </div>
         </main>
       );
     }
@@ -712,9 +732,6 @@ export default function RecordPage() {
             All-in ({stack} BB)
           </motion.button>
         </div>
-        <div className="shrink-0 p-2 text-center">
-          <Link href="/" className="text-p5-red text-xs font-bold">← TOP</Link>
-        </div>
       </main>
     );
   }
@@ -733,7 +750,7 @@ export default function RecordPage() {
         <div className="p-1.5 border-b border-white/20 flex flex-wrap items-center justify-between gap-1 shrink-0 bg-black/80">
           <PotDisplay compact />
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-bold text-p5-red" style={{ transform: 'skewX(-5deg)' }}>{gameState?.street.toUpperCase()}</span>
+            <span className="text-xs font-bold text-p5-red" style={{ transform: 'skewX(-5deg)' }}>{(pendingBoardStreet ?? gameState?.street)?.toUpperCase()}</span>
             {activePlayers.length > 0 && (
               <span className="text-xs text-white/90 font-bold">参加: {activePlayers.join(', ')}</span>
             )}
@@ -747,9 +764,6 @@ export default function RecordPage() {
             previousBoard={previousBoard}
             onConfirm={handleBoardConfirm}
           />
-        </div>
-        <div className="p-2 text-center">
-          <Link href="/" className="text-p5-red text-sm">← TOP</Link>
         </div>
       </main>
     );
@@ -842,10 +856,6 @@ export default function RecordPage() {
             </div>
           </>
         )}
-        <div className="mt-6 text-center">
-          <Link href="/" className="text-p5-red text-xs">← TOP</Link>
-        </div>
-
         {/* ショーダウン: せり上がりシート＋入力フォーム */}
         <AnimatePresence>
           {showShowdownSheet && (
@@ -1059,9 +1069,6 @@ export default function RecordPage() {
         >
           履歴へ
         </motion.button>
-        <div className="mt-4 text-center relative z-10">
-          <Link href="/" className="text-p5-red text-sm">← TOP</Link>
-        </div>
       </main>
     );
   }
@@ -1286,8 +1293,7 @@ export default function RecordPage() {
         </motion.div>
       </AnimatePresence>
 
-      <div className="p-1.5 shrink-0 flex justify-between items-center border-t border-white/10">
-        <Link href="/" className="text-p5-red font-p5-en text-xs font-bold">← TOP</Link>
+      <div className="p-1.5 shrink-0 flex justify-end items-center border-t border-white/10">
         <div className="flex items-center gap-3">
           <ActionHistory />
           <span className="font-p5-en text-xs text-gray-500">{gameState?.actions.length ?? 0}</span>

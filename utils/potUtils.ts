@@ -1,7 +1,11 @@
-import type { ActionRecord, Position, Street, PlayerState, SidePot } from '@/types/poker';
+import type { ActionRecord, Position, Street, PlayerState, SidePot, PotWinner } from '@/types/poker';
 
 // 初期ポット（SB + BB = 1.5BB）
 const INITIAL_POT = 1.5;
+
+// デフォルト初期スタック（startNewHand の stack: 100 と一致）
+// ブラインドがスタックから控除されないため、各プレイヤーの最大投入額をこの値でキャップする
+const DEFAULT_INITIAL_STACK = 100;
 
 /** このストリートでの各ポジションの投入額（BB単位）。プリフロはSB/BBのブラインドを含む */
 export function getContributionsThisStreet(
@@ -129,8 +133,15 @@ export function calculatePotForStreet(
     }
     // check/fold はポットに追加しない
   }
-  
-  return pot;
+
+  // BUG-9修正: ブラインドがスタックから控除されないため、
+  // オールイン時にplayerContributionsがinitialStackを超える場合がある。
+  // ポットを各プレイヤーのキャップ済み投入額の合計として再計算する。
+  let correctedPot = 0;
+  playerContributions.forEach((contrib) => {
+    correctedPot += Math.min(contrib, DEFAULT_INITIAL_STACK);
+  });
+  return correctedPot;
 }
 
 // 現在のポットを計算
@@ -245,6 +256,13 @@ export function getTotalContributions(actions: ActionRecord[]): Map<string, numb
     }
   }
 
+  // BUG-9修正: 各プレイヤーのcontributionをinitialStackでキャップ
+  for (const [pos, amount] of contributions) {
+    if (amount > DEFAULT_INITIAL_STACK) {
+      contributions.set(pos, DEFAULT_INITIAL_STACK);
+    }
+  }
+
   return contributions;
 }
 
@@ -308,4 +326,32 @@ export function calculateSidePots(actions: ActionRecord[], players: PlayerState[
   }
 
   return pots;
+}
+
+/** チョップ時の各プレイヤーの獲得額を計算（各ポットを勝者数で等分） */
+export function calculateWinnings(
+  potWinners: PotWinner[],
+  totalPot: number,
+  winners: Position | Position[]
+): Map<string, number> {
+  const winnings = new Map<string, number>();
+
+  if (potWinners.length > 0) {
+    for (const pw of potWinners) {
+      if (pw.winners.length === 0) continue;
+      const share = pw.potAmount / pw.winners.length;
+      for (const w of pw.winners) {
+        winnings.set(w, (winnings.get(w) ?? 0) + share);
+      }
+    }
+  } else {
+    const winnerArray = Array.isArray(winners) ? winners : [winners];
+    if (winnerArray.length === 0) return winnings;
+    const share = totalPot / winnerArray.length;
+    for (const w of winnerArray) {
+      winnings.set(w, share);
+    }
+  }
+
+  return winnings;
 }

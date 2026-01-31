@@ -1,52 +1,76 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import ParticleBackground from '@/components/home/ParticleBackground';
-import RevenueDisplay from '@/components/home/RevenueDisplay';
-import MenuExpander from '@/components/home/MenuExpander';
-import Link from 'next/link';
+import dynamic from 'next/dynamic';
+
+const RecordPage = dynamic(() => import('./record/page'), { ssr: false });
+const HistoryPage = dynamic(() => import('./history/page'), { ssr: false });
+
+type Tab = 'record' | 'history';
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'record', label: 'RECORD' },
+  { id: 'history', label: 'HISTORY' },
+];
 
 export default function Home() {
+  const [activeTab, setActiveTab] = useState<Tab>('record');
+
+  // BUG-7: カスタムイベントによるタブ切替（record/page.tsxから呼び出し）
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<string>).detail;
+      if (detail === 'history' || detail === 'record') {
+        setActiveTab(detail);
+      }
+    };
+    window.addEventListener('switchTab', handler);
+    return () => window.removeEventListener('switchTab', handler);
+  }, []);
+
   return (
-    <main
-      className="relative w-full overflow-x-hidden overflow-y-hidden"
-      style={{
-        minHeight: '100dvh',
-        maxHeight: '100dvh',
-        background: 'transparent',
-      }}
+    <div
+      className="bg-black text-white flex flex-col"
+      style={{ minHeight: '100dvh', maxHeight: '100dvh' }}
     >
-      {/* 背景パーティクル */}
-      <ParticleBackground />
-
-      {/* 収支表示（狭幅でも全要素が見える配置） */}
-      <RevenueDisplay />
-
-      {/* 扇状展開メニュー */}
-      <MenuExpander />
-
-      {/* 記録開始ボタン（中央下・狭幅でも必ず表示） */}
-      <motion.div
-        className="fixed left-1/2 z-30 flex justify-center"
-        style={{
-          bottom: 'min(2rem, 5vh)',
-          transform: 'translateX(-50%)',
-        }}
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5 }}
-      >
-        <Link href="/record">
-          <motion.button
-            className="px-8 py-4 sm:px-12 sm:py-6 bg-p5-red text-white font-bold text-xl sm:text-2xl polygon-button"
-            style={{ transform: 'skewX(-7deg)' }}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.92 }}
+      {/* Tab Navigation */}
+      <nav className="shrink-0 flex border-b border-white/20">
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            className={`relative flex-1 font-p5-en text-base tracking-wide transition-colors ${
+              activeTab === tab.id
+                ? 'text-white'
+                : 'text-gray-500 hover:text-gray-300'
+            }`}
+            style={{ height: '48px' }}
+            onClick={() => setActiveTab(tab.id)}
           >
-            記録開始
-          </motion.button>
-        </Link>
-      </motion.div>
-    </main>
+            <span style={{ display: 'inline-block', transform: 'skewX(-7deg)' }}>
+              {tab.label}
+            </span>
+            {activeTab === tab.id && (
+              <motion.div
+                className="absolute bottom-0 left-0 right-0 h-[3px] bg-p5-red"
+                layoutId="tab-indicator"
+                transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+              />
+            )}
+          </button>
+        ))}
+      </nav>
+
+      {/* Tab Content — both mounted to preserve state during recording */}
+      <div className="flex-1 min-h-0">
+        <div className={`h-full overflow-y-auto ${activeTab === 'record' ? '' : 'hidden'}`}>
+          <RecordPage />
+        </div>
+        <div className={`h-full overflow-y-auto ${activeTab === 'history' ? '' : 'hidden'}`}>
+          <HistoryPage />
+        </div>
+      </div>
+    </div>
   );
 }

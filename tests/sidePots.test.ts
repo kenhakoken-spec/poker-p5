@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import type { Position, ActionRecord, PlayerState } from '@/types/poker';
-import { calculateSidePots, getTotalContributions } from '@/utils/potUtils';
+import type { Position, ActionRecord, PlayerState, PotWinner } from '@/types/poker';
+import { calculateSidePots, getTotalContributions, calculateCurrentPot, calculatePotForStreet, calculateWinnings } from '@/utils/potUtils';
 
 function mkPlayer(position: Position, stack: number, active = true, isAllIn = false): PlayerState {
   return { position, stack, active, isAllIn };
@@ -175,6 +175,137 @@ describe('Side Pot Calculation', () => {
       const pots = calculateSidePots(actions, players);
       expect(pots.length).toBe(1);
       expect(pots[0].eligiblePositions).toEqual(['UTG']);
+    });
+  });
+
+  describe('BUG-9: チョップ時のポット計算（ブラインド超過キャップ）', () => {
+    it('BB all-in preflop: contribution capped at 100', () => {
+      // BBがプリフロでオールイン（100BB）、SBコール
+      // ブラインドが控除されないためBBの投入が101になるバグの修正確認
+      const actions: ActionRecord[] = [
+        mkAction('SB', 'call'),        // SBがBBにマッチ（0.5追加）
+        mkAction('BB', 'all-in', 100), // BBのスタック全額（ブラインド未控除で100）
+        mkAction('SB', 'call'),        // SBがBBにマッチ
+      ];
+      const contribs = getTotalContributions(actions);
+      // BBの投入: blind(1) + all-in(100) = 101 → キャップで100
+      expect(contribs.get('BB')).toBe(100);
+      // SBの投入: blind(0.5) + call(0.5) + call(99) = 100
+      expect(contribs.get('SB')).toBe(100);
+    });
+
+    it('SB all-in preflop: contribution capped at 100', () => {
+      // SBがプリフロでオールイン（100BB）
+      const actions: ActionRecord[] = [
+        mkAction('SB', 'all-in', 100), // SBのスタック全額
+        mkAction('BB', 'call'),        // BBコール
+      ];
+      const contribs = getTotalContributions(actions);
+      // SBの投入: blind(0.5) + all-in(100) = 100.5 → キャップで100
+      expect(contribs.get('SB')).toBe(100);
+      // BBの投入: blind(1) + call(99.5) = 100.5 → キャップで100
+      expect(contribs.get('BB')).toBe(100);
+    });
+
+    it('pot is correct when BB goes all-in (capped)', () => {
+      // BBオールイン、SBコール → ポット = 200（100+100）
+      const actions: ActionRecord[] = [
+        mkAction('BB', 'all-in', 100),
+        mkAction('SB', 'call'),
+      ];
+      const pot = calculateCurrentPot(actions);
+      // 修正前: 201（SB=100.5, BB=101） → 修正後: 200（SB=100, BB=100）
+      expect(pot).toBe(200);
+    });
+
+    it('chop pot split is correct with calculateWinnings', () => {
+      // HU: SBとBBがオールイン、チョップ → 各100BB返却
+      const actions: ActionRecord[] = [
+        mkAction('SB', 'all-in', 100),
+        mkAction('BB', 'call'),
+      ];
+      const players: PlayerState[] = [
+        mkPlayer('SB', 0, true, true),
+        mkPlayer('BB', 0, true, true),
+      ];
+      const pots = calculateSidePots(actions, players);
+      const potWinners: PotWinner[] = [{
+        potIndex: 0,
+        potAmount: pots[0].amount,
+        winners: ['SB', 'BB'] as Position[],
+      }];
+      const winnings = calculateWinnings(potWinners, pots[0].amount, ['SB', 'BB'] as Position[]);
+      // 各プレイヤーは100BB（投入額と同じ）を獲得
+      expect(winnings.get('SB')).toBe(100);
+      expect(winnings.get('BB')).toBe(100);
+    });
+
+    it('3-way chop with all-in: pot correctly capped', () => {
+      // UTG bet 3, BB all-in 100, SB all-in 100, UTG call
+      const actions: ActionRecord[] = [
+        mkAction('UTG', 'bet', 3),
+        mkAction('SB', 'all-in', 100),
+        mkAction('BB', 'all-in', 100),
+        mkAction('UTG', 'call'),
+      ];
+      const contribs = getTotalContributions(actions);
+      // 各プレイヤーの投入が100を超えないこと
+      expect(contribs.get('SB')).toBe(100);
+      expect(contribs.get('BB')).toBe(100);
+      expect(contribs.get('UTG')).toBe(100);
+
+      const pot = calculateCurrentPot(actions);
+      // 全員100BBずつ → ポット = 300
+      expect(pot).toBe(300);
+    });
+
+    it('non-all-in contributions are not affected by cap', () => {
+      // 通常のベット（100未満）はキャップの影響を受けない
+      const actions: ActionRecord[] = [
+        mkAction('UTG', 'bet', 3),
+        mkAction('BB', 'call'),
+      ];
+      const contribs = getTotalContributions(actions);
+      expect(contribs.get('UTG')).toBe(3);
+      expect(contribs.get('BB')).toBe(3);
+      expect(contribs.get('SB')).toBe(0.5);
+
+      const pot = calculateCurrentPot(actions);
+      // SB(0.5) + BB(3) + UTG(3) = 6.5
+      expect(pot).toBe(6.5);
+    });
+
+    it('calculateWinnings with single winner (no chop)', () => {
+      const totalPot = 200;
+      const winnings = calculateWinnings([], totalPot, 'BB' as Position);
+      expect(winnings.get('BB')).toBe(200);
+      expect(winnings.size).toBe(1);
+    });
+
+    it('calculateWinnings with potWinners for side pots', () => {
+      const potWinners: PotWinner[] = [
+        { potIndex: 0, potAmount: 60, winners: ['UTG', 'MP'] as Position[] },
+        { potIndex: 1, potAmount: 40, winners: ['MP'] as Position[] },
+      ];
+      const winnings = calculateWinnings(potWinners, 100, ['UTG', 'MP'] as Position[]);
+      // UTG: 60/2 = 30
+      expect(winnings.get('UTG')).toBe(30);
+      // MP: 60/2 + 40 = 70
+      expect(winnings.get('MP')).toBe(70);
+    });
+
+    it('calculatePotForStreet with BB all-in on flop', () => {
+      const actions: ActionRecord[] = [
+        mkAction('UTG', 'bet', 3),
+        mkAction('BB', 'call'),
+        mkAction('BB', 'all-in', 97, 'flop'),
+        mkAction('UTG', 'call', undefined, 'flop'),
+      ];
+      const pot = calculatePotForStreet(actions, 'flop');
+      // Preflop: SB(0.5) + UTG(3) + BB(3) = 6.5
+      // Flop: BB all-in 97 → BB total = 3+97=100, UTG call → UTG total should cap at 100
+      // Total: SB(0.5) + BB(100) + UTG(100) = 200.5
+      expect(pot).toBe(200.5);
     });
   });
 });

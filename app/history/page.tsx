@@ -6,7 +6,6 @@ import { loadHistory, saveHistory } from '@/utils/storage';
 import { exportToGemini, exportHandToGemini } from '@/utils/gemini';
 import { calculateCurrentPot } from '@/utils/potUtils';
 import type { Hand, ActionRecord } from '@/types/poker';
-import Link from 'next/link';
 
 const STREET_ORDER = ['preflop', 'flop', 'turn', 'river'] as const;
 
@@ -26,6 +25,30 @@ function groupByStreet(actions: ActionRecord[]) {
     groups[a.street]!.push(a);
   }
   return groups;
+}
+
+const SUIT_MAP: Record<string, { symbol: string; color: string }> = {
+  s: { symbol: '♠', color: '#d1d5db' },
+  h: { symbol: '♥', color: '#ef4444' },
+  d: { symbol: '♦', color: '#ef4444' },
+  c: { symbol: '♣', color: '#d1d5db' },
+  '♠': { symbol: '♠', color: '#d1d5db' },
+  '♥': { symbol: '♥', color: '#ef4444' },
+  '♦': { symbol: '♦', color: '#ef4444' },
+  '♣': { symbol: '♣', color: '#d1d5db' },
+};
+
+function CardText({ card, hero }: { card: string; hero?: boolean }) {
+  const rank = card.slice(0, -1);
+  const suitChar = card.slice(-1).toLowerCase();
+  const suit = SUIT_MAP[suitChar] ?? SUIT_MAP[card.slice(-1)];
+  if (!suit) return <span>{card}</span>;
+  return (
+    <span style={{ fontWeight: hero ? 700 : 400 }}>
+      <span style={{ color: hero ? '#ffffff' : '#9ca3af' }}>{rank}</span>
+      <span style={{ color: suit.color }}>{suit.symbol}</span>
+    </span>
+  );
 }
 
 export default function HistoryPage() {
@@ -143,65 +166,89 @@ export default function HistoryPage() {
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.02 }}
                 >
-                  {/* Summary row */}
+                  {/* Summary section */}
                   <div
-                    className="flex items-center gap-1.5 px-3 py-2 cursor-pointer select-none hover:bg-white/5 transition-colors"
+                    className="px-3 py-2 cursor-pointer select-none hover:bg-white/5 transition-colors"
                     onClick={() => setExpandedId(prev => prev === hand.id ? null : hand.id)}
                   >
-                    {/* Favorite */}
-                    <button
-                      className={`text-base shrink-0 ${hand.favorite ? 'text-yellow-400' : 'text-gray-700 hover:text-gray-500'}`}
-                      onClick={e => { e.stopPropagation(); toggleFavorite(hand.id); }}
-                    >
-                      {hand.favorite ? '★' : '☆'}
-                    </button>
+                    {/* Line 1: core info + cards */}
+                    <div className="flex items-center gap-1.5">
+                      {/* Favorite */}
+                      <button
+                        className={`text-base shrink-0 ${hand.favorite ? 'text-yellow-400' : 'text-gray-700 hover:text-gray-500'}`}
+                        onClick={e => { e.stopPropagation(); toggleFavorite(hand.id); }}
+                      >
+                        {hand.favorite ? '★' : '☆'}
+                      </button>
 
-                    {/* Date */}
-                    <span className="text-[11px] text-gray-500 shrink-0 tabular-nums">{dateStr}</span>
+                      {/* Position */}
+                      <span className="font-p5-en text-xs font-bold shrink-0 text-white/80">
+                        {hand.heroPosition ?? '—'}
+                      </span>
 
-                    {/* Position */}
-                    <span className="font-p5-en text-xs font-bold shrink-0 text-white/80">
-                      {hand.heroPosition ?? '—'}
-                    </span>
+                      {/* Result */}
+                      {hand.result && (
+                        <span
+                          className={`font-p5-en text-xs font-black shrink-0 ${
+                            hand.result.won ? 'text-p5-red' : 'text-gray-400'
+                          }`}
+                        >
+                          {hand.result.won ? '+' : ''}{hand.result.amount}BB
+                        </span>
+                      )}
 
-                    {/* Result */}
-                    {hand.result && (
+                      {/* Hero Hand */}
+                      {hand.heroHand && hand.heroHand.length > 0 && (
+                        <span className="shrink-0 text-xs flex items-center">
+                          {hand.heroHand.map((c, i) => <CardText key={i} card={c} hero />)}
+                        </span>
+                      )}
+
+                      {/* Separator */}
+                      {(hand.heroHand && hand.heroHand.length > 0 && hand.board && hand.board.length > 0) && (
+                        <span className="text-gray-600 text-[10px] shrink-0">|</span>
+                      )}
+
+                      {/* Board */}
+                      {hand.board && hand.board.length > 0 ? (
+                        <span className="shrink-0 text-[11px] flex items-center min-w-0">
+                          {hand.board.map((c, i) => <CardText key={i} card={c} />)}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-gray-600 shrink-0 italic">No board</span>
+                      )}
+
+                      {/* Spacer */}
+                      <span className="flex-1 min-w-0" />
+
+                      {/* Delete */}
+                      <button
+                        className="text-red-600/50 hover:text-red-400 text-sm shrink-0 px-1"
+                        onClick={e => { e.stopPropagation(); deleteHand(hand.id); }}
+                      >
+                        ×
+                      </button>
+
+                      {/* Expand indicator */}
                       <span
-                        className={`font-p5-en text-xs font-black shrink-0 ${
-                          hand.result.won ? 'text-p5-red' : 'text-gray-400'
+                        className={`text-gray-600 text-[10px] shrink-0 transition-transform duration-200 ${
+                          isExpanded ? 'rotate-90' : ''
                         }`}
                       >
-                        {hand.result.won ? '+' : ''}{hand.result.amount}BB
+                        ▶
                       </span>
-                    )}
+                    </div>
 
-                    {/* Pot */}
-                    <span className="text-[11px] text-gray-600 shrink-0">{pot}BB</span>
-
-                    {/* Memo icon */}
-                    {hand.memo && (
-                      <span className="text-[10px] text-yellow-600 shrink-0">📝</span>
-                    )}
-
-                    {/* Spacer */}
-                    <span className="flex-1 min-w-0" />
-
-                    {/* Delete */}
-                    <button
-                      className="text-red-600/50 hover:text-red-400 text-sm shrink-0 px-1"
-                      onClick={e => { e.stopPropagation(); deleteHand(hand.id); }}
-                    >
-                      ×
-                    </button>
-
-                    {/* Expand indicator */}
-                    <span
-                      className={`text-gray-600 text-[10px] shrink-0 transition-transform duration-200 ${
-                        isExpanded ? 'rotate-90' : ''
-                      }`}
-                    >
-                      ▶
-                    </span>
+                    {/* Line 2: date, pot, memo preview */}
+                    <div className="flex items-center gap-1.5 pl-7 mt-0.5">
+                      <span className="text-[10px] text-gray-600 shrink-0 tabular-nums">{dateStr}</span>
+                      <span className="text-[10px] text-gray-700 shrink-0">{pot}BB</span>
+                      {hand.memo && (
+                        <span className="text-[10px] text-gray-500 truncate min-w-0 flex-1">
+                          📝 {hand.memo}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {/* Expanded detail */}
@@ -305,10 +352,6 @@ export default function HistoryPage() {
             })}
           </div>
         )}
-
-        <Link href="/" className="text-p5-red hover:underline mt-6 inline-block font-bold text-sm">
-          ← Back to TOP
-        </Link>
       </div>
     </main>
   );

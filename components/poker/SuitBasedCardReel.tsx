@@ -40,7 +40,7 @@ export default function SuitBasedCardReel({
   }, []);
 
   return (
-    <div className={`flex flex-col gap-0 ${className}`} style={{ maxHeight: '100%' }}>
+    <div className={`flex flex-col gap-px ${className}`} style={{ maxHeight: '100%' }}>
       <style>{`.suit-reel-scroll::-webkit-scrollbar{display:none}`}</style>
       {SUITS.map((suit, suitIndex) => (
         <div key={suit.name} className="flex items-stretch shrink-0 min-h-0 flex-1">
@@ -101,7 +101,7 @@ export default function SuitBasedCardReel({
                     key={card}
                     type="button"
                     data-testid={`card-${card}`}
-                    className="shrink-0 w-10 h-11 sm:w-11 sm:h-12 flex items-center justify-center font-black border-2 rounded-lg text-lg"
+                    className="shrink-0 w-10 h-[52px] sm:w-11 sm:h-14 flex items-center justify-center font-black border-2 rounded-lg text-xl"
                     style={{
                       transform: 'skewX(-8deg)',
                       scrollSnapAlign: 'center',

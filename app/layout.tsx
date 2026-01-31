@@ -10,8 +10,8 @@ const bebasNeue = Bebas_Neue({
 });
 
 export const metadata: Metadata = {
-  title: "Poker3 - ペルソナ5スタイル ポーカー記録",
-  description: "ライブテキサスホールデムポーカー記録アプリ",
+  title: "Live Poker Tracker",
+  description: "Live poker hand tracking and analysis",
 };
 
 export default function RootLayout({

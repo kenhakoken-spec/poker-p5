@@ -26,6 +26,8 @@ export default function BoardSelector({ street, count, usedCards, previousBoard 
   const [selected, setSelected] = useState<string[]>([]);
 
   const handleTap = (card: string) => {
+    // BUG-6: 使用済みカードの選択を防止
+    if (usedCards.includes(card)) return;
     if (selected.includes(card)) {
       setSelected(selected.filter((c) => c !== card));
       return;
@@ -52,7 +54,7 @@ export default function BoardSelector({ street, count, usedCards, previousBoard 
             {previousBoard.map((c, i) => (
               <motion.span
                 key={c}
-                className="px-3 py-1.5 bg-gray-800 text-white font-black text-sm rounded border border-white/30"
+                className={`px-2 py-1 bg-gray-800 font-black text-sm rounded border border-white/30 ${getSuitColorClass(c)}`}
                 style={{ transform: 'skewX(-8deg)' }}
                 initial={{ opacity: 0, scale: 0.6, y: -10 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -119,20 +121,24 @@ export default function BoardSelector({ street, count, usedCards, previousBoard 
           usedCards={usedCards}
           selected={selected}
           onSelect={handleTap}
-          isSelectable={(card) => selected.includes(card) || selected.length < count}
+          isSelectable={(card) => !usedCards.includes(card) && (selected.includes(card) || selected.length < count)}
           className="flex-1 min-h-0 overflow-y-auto"
         />
       </div>
 
-      {/* 確定ボタン */}
+      {/* 確定ボタン — BUG-5: 視覚的disabled表示 */}
       <motion.button
-        className="shrink-0 mt-2 py-4 bg-p5-red text-white font-black polygon-button w-full"
+        className={`shrink-0 mt-2 py-4 font-black polygon-button w-full ${
+          selected.length === count
+            ? 'bg-p5-red text-white'
+            : 'bg-gray-700 text-gray-500 cursor-not-allowed'
+        }`}
         style={{ transform: 'skewX(-7deg)' }}
         disabled={selected.length !== count}
-        whileTap={{ scale: 0.95 }}
+        whileTap={selected.length === count ? { scale: 0.95 } : undefined}
         onClick={() => selected.length === count && onConfirm(selected)}
       >
-        確定
+        確定 ({selected.length}/{count})
       </motion.button>
     </div>
   );
