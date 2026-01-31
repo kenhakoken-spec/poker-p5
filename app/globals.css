@@ -1,0 +1,284 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --p5-red: #D50000;
+  --p5-black: #000000;
+  --p5-white: #FFFFFF;
+}
+
+body {
+  background: linear-gradient(135deg, #0a0505 0%, #000000 50%, #0a0505 100%);
+  background-attachment: fixed;
+  @apply text-white;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* B3: 背景ストライプ強化 — 3層ストライプ（細2px + 太6px + 白アクセント） */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background:
+    repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 2px,
+      rgba(213, 0, 0, 0.08) 2px,
+      rgba(213, 0, 0, 0.08) 4px
+    ),
+    repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 24px,
+      rgba(213, 0, 0, 0.05) 24px,
+      rgba(213, 0, 0, 0.05) 30px
+    ),
+    repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 38px,
+      rgba(255, 255, 255, 0.03) 38px,
+      rgba(255, 255, 255, 0.03) 40px
+    );
+  background-size: 200px 200px;
+  animation: stripe-sweep 20s linear infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* B3: 斜めスイープアニメーション */
+body::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    135deg,
+    transparent 45%,
+    rgba(213, 0, 0, 0.06) 49%,
+    rgba(213, 0, 0, 0.12) 50%,
+    rgba(213, 0, 0, 0.06) 51%,
+    transparent 55%
+  );
+  background-size: 300% 300%;
+  animation: body-sweep 8s linear infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@keyframes stripe-sweep {
+  0% { background-position: 0 0; }
+  100% { background-position: 200px 200px; }
+}
+
+@keyframes body-sweep {
+  0% { background-position: 200% 0%; }
+  100% { background-position: -100% 100%; }
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+/* 慣性スクロール */
+.scroll-inertia {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* パーティクル用の星型と破片の形状 */
+.star-shape {
+  clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+}
+
+.fragment-shape {
+  clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%);
+}
+
+/* ポリゴン形状のボタン */
+.polygon-button {
+  clip-path: polygon(10% 0%, 100% 0%, 90% 100%, 0% 100%);
+  position: relative;
+}
+
+/* B12: タップリプルエフェクト（斜め矩形拡張） */
+.polygon-button::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(213, 0, 0, 0.3);
+  transform: scaleX(0) skewX(-15deg);
+  transform-origin: center;
+  transition: transform 0.3s ease-out;
+  pointer-events: none;
+}
+
+.polygon-button:active::after {
+  transform: scaleX(1.2) skewX(-15deg);
+  transition: transform 0.1s ease-out;
+}
+
+/* スプラッシュエフェクト用 */
+.splash-effect {
+  position: absolute;
+  pointer-events: none;
+  z-index: 1000;
+}
+
+/* P5風英字タイトル（極太・雑誌風） */
+.font-p5-en {
+  font-family: var(--font-p5-en), sans-serif;
+  letter-spacing: 0.02em;
+}
+
+/* B1: Red Glow System */
+.glow-red {
+  box-shadow: 0 0 15px rgba(213, 0, 0, 0.5), 0 0 30px rgba(213, 0, 0, 0.3);
+}
+
+.glow-red-intense {
+  box-shadow: 0 0 20px rgba(213, 0, 0, 0.7), 0 0 40px rgba(213, 0, 0, 0.3), 0 0 60px rgba(213, 0, 0, 0.15);
+}
+
+.glow-red-text {
+  text-shadow: 0 0 10px rgba(213, 0, 0, 0.8), 0 0 20px rgba(213, 0, 0, 0.4);
+}
+
+.glow-red-border {
+  box-shadow: inset 0 0 10px rgba(213, 0, 0, 0.3);
+}
+
+.glow-red-pulse {
+  animation: glow-pulse 2.5s ease-in-out infinite;
+}
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 10px rgba(213, 0, 0, 0.3); }
+  50% { box-shadow: 0 0 20px rgba(213, 0, 0, 0.6), 0 0 40px rgba(213, 0, 0, 0.2); }
+}
+
+/* B11: 斜めディバイダー */
+.p5-divider {
+  position: relative;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    rgba(213, 0, 0, 0.9),
+    transparent
+  );
+  transform: skewX(-20deg);
+  margin: 8px 0;
+}
+
+.p5-divider::before,
+.p5-divider::after {
+  content: '';
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: var(--p5-red);
+  transform: rotate(45deg);
+  top: -2px;
+}
+
+.p5-divider::before {
+  left: 15%;
+}
+
+.p5-divider::after {
+  right: 15%;
+}
+
+/* B9: アイドルブリージング */
+@keyframes idle-breathe {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-1.5px); }
+}
+
+@keyframes idle-border-pulse {
+  0%, 100% { border-color: rgba(255, 255, 255, 0.5); }
+  50% { border-color: rgba(255, 255, 255, 0.8); }
+}
+
+/* B14: カード3Dフリップ */
+.card-flip-container {
+  perspective: 800px;
+}
+
+.card-flip-inner {
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.6s ease;
+}
+
+.card-flip-inner.flipped {
+  transform: rotateY(180deg);
+}
+
+.card-flip-front,
+.card-flip-back {
+  backface-visibility: hidden;
+}
+
+.card-flip-back {
+  position: absolute;
+  inset: 0;
+  transform: rotateY(180deg);
+  background: var(--p5-red);
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 4px,
+    rgba(255, 255, 255, 0.1) 4px,
+    rgba(255, 255, 255, 0.1) 6px
+  );
+}
+
+/* B13: ヘッダー帯アニメーション（translateX方式） */
+@keyframes header-sweep {
+  0% { transform: translateX(-100%) skewX(-20deg); }
+  100% { transform: translateX(200%) skewX(-20deg); }
+}
+
+.p5-header-sweep,
+.header-sweep-bg {
+  position: relative;
+  overflow: hidden;
+}
+
+.p5-header-sweep::before,
+.header-sweep-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 50%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.06),
+    transparent
+  );
+  animation: header-sweep 4s linear infinite;
+  pointer-events: none;
+}
+
+/* B15: カードリール赤インジケーター */
+@keyframes suit-pulse {
+  0%, 100% { opacity: 0.8; transform: skewX(-8deg) scale(1); }
+  50% { opacity: 1; transform: skewX(-8deg) scale(1.08); }
+}
