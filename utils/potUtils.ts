@@ -1,11 +1,9 @@
 import type { ActionRecord, Position, Street, PlayerState, SidePot, PotWinner } from '@/types/poker';
+import { POKER_CONFIG } from '@/utils/pokerConfig';
 
-// 初期ポット（SB + BB = 1.5BB）
-const INITIAL_POT = 1.5;
-
-// デフォルト初期スタック（startNewHand の stack: 100 と一致）
-// ブラインドがスタックから控除されないため、各プレイヤーの最大投入額をこの値でキャップする
-const DEFAULT_INITIAL_STACK = 100;
+// STACK-RULE-001: 設定値から算出
+const INITIAL_POT = POKER_CONFIG.blinds.sb + POKER_CONFIG.blinds.bb;
+const DEFAULT_INITIAL_STACK = POKER_CONFIG.defaultStack;
 
 /** このストリートでの各ポジションの投入額（BB単位）。プリフロはSB/BBのブラインドを含む */
 export function getContributionsThisStreet(
@@ -14,10 +12,10 @@ export function getContributionsThisStreet(
 ): Map<string, number> {
   const contributions = new Map<string, number>();
   if (street === 'preflop') {
-    contributions.set('SB', 0.5);
-    contributions.set('BB', 1);
+    contributions.set('SB', POKER_CONFIG.blinds.sb);
+    contributions.set('BB', POKER_CONFIG.blinds.bb);
   }
-  let currentBet = street === 'preflop' ? 1 : 0;
+  let currentBet = street === 'preflop' ? POKER_CONFIG.blinds.bb : 0;
 
   const streetActions = actions.filter((a) => a.street === street);
   for (const action of streetActions) {
@@ -107,9 +105,9 @@ export function calculatePotForStreet(
 
   // ブラインドを初期状態として常に設定（プリフロップアクションは全ストリートで処理されるため）
   // INITIAL_POTにブラインドが含まれるので、playerContributionsにも反映が必要
-  currentBet = 1; // BB
-  playerContributions.set('SB', 0.5);
-  playerContributions.set('BB', 1);
+  currentBet = POKER_CONFIG.blinds.bb;
+  playerContributions.set('SB', POKER_CONFIG.blinds.sb);
+  playerContributions.set('BB', POKER_CONFIG.blinds.bb);
 
   for (const action of relevantActions) {
     const playerKey = action.position;
@@ -203,18 +201,18 @@ export function getPotAfterEachAction(actions: ActionRecord[]): number[] {
 export function getTotalContributions(actions: ActionRecord[]): Map<string, number> {
   const contributions = new Map<string, number>();
   // ブラインド初期値
-  contributions.set('SB', 0.5);
-  contributions.set('BB', 1);
+  contributions.set('SB', POKER_CONFIG.blinds.sb);
+  contributions.set('BB', POKER_CONFIG.blinds.bb);
 
   let currentBetByStreet = new Map<string, number>(); // street -> currentBet
   let contribByStreet = new Map<string, Map<string, number>>(); // street -> position -> contribution
 
   // プリフロのブラインド初期設定
   const preflopContrib = new Map<string, number>();
-  preflopContrib.set('SB', 0.5);
-  preflopContrib.set('BB', 1);
+  preflopContrib.set('SB', POKER_CONFIG.blinds.sb);
+  preflopContrib.set('BB', POKER_CONFIG.blinds.bb);
   contribByStreet.set('preflop', preflopContrib);
-  currentBetByStreet.set('preflop', 1);
+  currentBetByStreet.set('preflop', POKER_CONFIG.blinds.bb);
 
   for (const action of actions) {
     const street = action.street;

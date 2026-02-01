@@ -71,8 +71,9 @@ describe('BUG-26: 3way勝者候補テスト', () => {
       });
 
       // Preflop: UTG raise 3, SB call, BB call
-      // SB call: callAmount = 3 - 0.5(blind) = 2.5, stack: 100 - 2.5 = 97.5
-      // BB call: callAmount = 3 - 1(blind) = 2, stack: 100 - 2 = 98
+      // BUG-28: ブラインド控除済み (SB=99.5, BB=99, UTG=100)
+      // SB call: callAmount = 3 - 0.5(blind) = 2.5, stack: 99.5 - 2.5 = 97
+      // BB call: callAmount = 3 - 1(blind) = 2, stack: 99 - 2 = 97
       // UTG: stack = 100 - 3 = 97
       act(() => {
         result.current.addAction(mkAction('UTG', 'raise', 'preflop', 3));
@@ -84,9 +85,9 @@ describe('BUG-26: 3way勝者候補テスト', () => {
         result.current.addAction(mkAction('BB', 'call', 'preflop'));
       });
 
-      // Flop: SB all-in (stack=97.5, amount=97.5 → stack=0)
+      // Flop: SB all-in (stack=97, amount=97 → stack=0)
       act(() => {
-        result.current.addAction(mkAction('SB', 'all-in', 'flop', 97.5));
+        result.current.addAction(mkAction('SB', 'all-in', 'flop', 97));
       });
 
       // SB is now all-in
@@ -96,20 +97,20 @@ describe('BUG-26: 3way勝者候補テスト', () => {
       expect(sb.active).toBe(true);
       expect(sb.stack).toBe(0);
 
-      // BB calls (stack=98, callAmount=97.5, newStack=0.5)
-      // isAllIn = (action==='all-in' || newStack<=0) = (false || false) = false
-      // NOTE: BB has only 0.5BB left but is NOT marked as all-in
+      // BB calls (stack=97, callAmount=97, newStack=0)
+      // BUG-28: ブラインド控除により全員同スタック → 全員all-in
+      // isAllIn = (action==='all-in' || newStack<=0) = (false || true) = true
       act(() => {
         result.current.addAction(mkAction('BB', 'call', 'flop'));
       });
 
       players = result.current.gameState!.players;
       const bb = players.find(p => p.position === 'BB')!;
-      expect(bb.isAllIn).toBe(false); // 0.5 remaining → NOT all-in per current logic
+      expect(bb.isAllIn).toBe(true); // BUG-28: 97 - 97 = 0 → all-in
       expect(bb.active).toBe(true);
-      expect(bb.stack).toBe(0.5);
+      expect(bb.stack).toBe(0);
 
-      // UTG calls (stack=97, callAmount=97.5, newStack=max(0,-0.5)=0)
+      // UTG calls (stack=97, callAmount=97, newStack=0)
       // isAllIn = (false || 0<=0) = true
       act(() => {
         result.current.addAction(mkAction('UTG', 'call', 'flop'));
@@ -126,8 +127,8 @@ describe('BUG-26: 3way勝者候補テスト', () => {
       expect(getActivePlayers(players)).toEqual(
         expect.arrayContaining(['SB', 'BB', 'UTG']),
       );
-      // SB/UTG are all-in, BB has 0.5 remaining → acting = [BB]
-      expect(getActingPlayers(players)).toEqual(['BB']);
+      // BUG-28: 全員all-in → acting = []
+      expect(getActingPlayers(players)).toEqual([]);
     });
   });
 
@@ -148,9 +149,8 @@ describe('BUG-26: 3way勝者候補テスト', () => {
         result.current.addAction(mkAction('UTG', 'raise', 'preflop', 3));
       });
 
-      // SB 3bet all-in (SB stack=100, blind not deducted, amount=99.5)
-      // stack: 100 - 99.5 = 0.5, isAllIn=true (action==='all-in')
-      // NOTE: SB has 0.5 remaining because startNewHand doesn't deduct blinds from stack
+      // SB 3bet all-in (SB stack=99.5 after BUG-28 blind deduction, amount=99.5)
+      // stack: 99.5 - 99.5 = 0, isAllIn=true (action==='all-in')
       act(() => {
         result.current.addAction(mkAction('SB', 'all-in', 'preflop', 99.5));
       });
@@ -158,7 +158,7 @@ describe('BUG-26: 3way勝者候補テスト', () => {
       let players = result.current.gameState!.players;
       const sbAfterAllIn = players.find(p => p.position === 'SB')!;
       expect(sbAfterAllIn.isAllIn).toBe(true);
-      expect(sbAfterAllIn.stack).toBe(0.5); // blind not deducted from stack
+      expect(sbAfterAllIn.stack).toBe(0); // BUG-28: blind deducted, 99.5 - 99.5 = 0
 
       // BB folds
       act(() => {
@@ -180,10 +180,10 @@ describe('BUG-26: 3way勝者候補テスト', () => {
       const bb = players.find(p => p.position === 'BB')!;
       const utg = players.find(p => p.position === 'UTG')!;
 
-      // SB: active=true, isAllIn=true, stack=0.5
+      // SB: active=true, isAllIn=true, stack=0 (BUG-28: blind deducted)
       expect(sb.active).toBe(true);
       expect(sb.isAllIn).toBe(true);
-      expect(sb.stack).toBe(0.5);
+      expect(sb.stack).toBe(0);
 
       // BB: active=false (folded)
       expect(bb.active).toBe(false);
@@ -229,11 +229,11 @@ describe('BUG-26: 3way勝者候補テスト', () => {
 
       const players = result.current.gameState!.players;
 
-      // SB: active, all-in, stack=0.5 (blind not deducted)
+      // SB: active, all-in, stack=0 (BUG-28: blind deducted, 99.5 - 99.5 = 0)
       const sb = players.find(p => p.position === 'SB')!;
       expect(sb.active).toBe(true);
       expect(sb.isAllIn).toBe(true);
-      expect(sb.stack).toBe(0.5);
+      expect(sb.stack).toBe(0);
 
       // BB: folded
       const bb = players.find(p => p.position === 'BB')!;
@@ -266,7 +266,7 @@ describe('BUG-26: 3way勝者候補テスト', () => {
         mkAction('SB', 'call', 'preflop'),
         mkAction('BB', 'call', 'preflop'),
         // Flop
-        mkAction('SB', 'all-in', 'flop', 97.5),
+        mkAction('SB', 'all-in', 'flop', 97),
         mkAction('BB', 'call', 'flop'),
         mkAction('UTG', 'call', 'flop'),
       ];
@@ -284,24 +284,22 @@ describe('BUG-26: 3way勝者候補テスト', () => {
       expect(players.find(p => p.position === 'SB')!.isAllIn).toBe(true);
       expect(players.find(p => p.position === 'SB')!.stack).toBe(0);
 
-      // BB: stack = 98 - 97.5 = 0.5, isAllIn = true (newStack <= 0 → wait, 0.5 > 0)
-      // Actually: BB stack after preflop call = 98. callAmount on flop = 97.5.
-      // 98 - 97.5 = 0.5. isAllIn check: action === 'all-in' (false, it's 'call') || newStack <= 0 (0.5 > 0 → false)
-      // So BB is NOT all-in! BB has 0.5 remaining.
+      // BUG-28: BB stack after preflop = 97. callAmount on flop = 97. 97 - 97 = 0.
+      // isAllIn: newStack <= 0 → true
       const bb = players.find(p => p.position === 'BB')!;
-      expect(bb.isAllIn).toBe(false);
-      expect(bb.stack).toBe(0.5);
+      expect(bb.isAllIn).toBe(true);
+      expect(bb.stack).toBe(0);
       expect(bb.active).toBe(true);
 
-      // UTG: stack after preflop = 97. callAmount on flop = 97.5.
-      // 97 - 97.5 = -0.5 → Math.max(0, -0.5) = 0. isAllIn: newStack <= 0 → true
+      // UTG: stack after preflop = 97. callAmount on flop = 97. 97 - 97 = 0.
+      // isAllIn: newStack <= 0 → true
       const utg = players.find(p => p.position === 'UTG')!;
       expect(utg.isAllIn).toBe(true);
       expect(utg.stack).toBe(0);
       expect(utg.active).toBe(true);
 
-      // Acting players: BB only (SB/UTG all-in)
-      expect(getActingPlayers(players)).toEqual(['BB']);
+      // BUG-28: 全員all-in → acting = []
+      expect(getActingPlayers(players)).toEqual([]);
     });
   });
 });

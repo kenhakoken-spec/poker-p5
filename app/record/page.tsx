@@ -10,6 +10,7 @@ import { getPreflopBetSizes } from '@/utils/bettingUtils';
 import { evaluateHand } from '@/utils/handEvaluator';
 import { getSelectablePositions, validateAction } from '@/utils/recordFlowValidation';
 import pkg from '../../package.json';
+import { POKER_CONFIG } from '@/utils/pokerConfig';
 import HeroSelector from '@/components/poker/HeroSelector';
 import PositionSelector from '@/components/poker/PositionSelector';
 import ActionSizeSelector from '@/components/poker/ActionSizeSelector';
@@ -283,7 +284,7 @@ export default function RecordPage() {
       street: 'preflop' as Street,
       timestamp: Date.now(),
     }));
-    const stack = gameState.players.find((p) => p.position === nextPosition)?.stack ?? 100;
+    const stack = gameState.players.find((p) => p.position === nextPosition)?.stack ?? POKER_CONFIG.defaultStack;
     const mainAction: ActionRecord = {
       position: nextPosition,
       action: action === 'call' ? ('call' as Action) : action === 'all-in' ? ('all-in' as Action) : ('raise' as Action),
@@ -592,8 +593,8 @@ export default function RecordPage() {
         >
           Start
         </motion.button>
-        {/* UI-46: バージョン表示をコンテンツフロー内に配置（Chrome URLバーに隠れない） */}
-        <span className="mt-6 text-[10px] font-p5-en text-white/30">v{pkg.version}</span>
+        {/* UI-49: バージョン表示を最下部中央に配置 */}
+        <span className="mt-6 text-[10px] font-p5-en text-white/30 text-center w-full">v{pkg.version}</span>
       </main>
     );
   }
@@ -612,7 +613,7 @@ export default function RecordPage() {
     const order: Position[] = ['UTG', 'MP', 'CO', 'BTN', 'SB', 'BB'];
     const openerForSheet = whoOpenSelectedPosition;
     const stackForOpener = openerForSheet
-      ? (gameState?.players.find((p) => p.position === openerForSheet)?.stack ?? 100)
+      ? (gameState?.players.find((p) => p.position === openerForSheet)?.stack ?? POKER_CONFIG.defaultStack)
       : 0;
     const openSizes = openerForSheet ? getPreflopBetSizes(stackForOpener, undefined) : [];
 
@@ -772,7 +773,7 @@ export default function RecordPage() {
     if (!gameState) return null;
     const opponentForSheet = preflopNextToAct;
     const stackForOpponent = opponentForSheet
-      ? (gameState.players.find((p) => p.position === opponentForSheet)?.stack ?? 100)
+      ? (gameState.players.find((p) => p.position === opponentForSheet)?.stack ?? POKER_CONFIG.defaultStack)
       : 0;
     const lastBet = gameState.lastBet;
     const minRaise = Math.max((lastBet ?? 2) * 2, 4);

@@ -5,6 +5,7 @@ import type { Hand, ActionRecord, Position, Street, GameState, PlayerState, Show
 import { addHand } from '@/utils/storage';
 import { getActionOrder, getActivePlayers, getActingPlayers } from '@/utils/pokerUtils';
 import { calculateCurrentPot, isStreetClosed, getContributionsThisStreet, getMaxContributionThisStreet, calculateSidePots } from '@/utils/potUtils';
+import { POKER_CONFIG } from '@/utils/pokerConfig';
 
 interface HandContextType {
   currentHand: Hand | null;
@@ -34,9 +35,14 @@ export function HandProvider({ children }: { children: ReactNode }) {
       actions: [],
     };
 
+    // BUG-28 + STACK-RULE-001: ブラインドをスタックから控除
+    const blindAmounts: Record<string, number> = {
+      SB: POKER_CONFIG.blinds.sb,
+      BB: POKER_CONFIG.blinds.bb,
+    };
     const players: PlayerState[] = positions.map((pos) => ({
       position: pos,
-      stack: 100, // デフォルト100BB
+      stack: POKER_CONFIG.defaultStack - (blindAmounts[pos] ?? 0),
       active: true,
       isAllIn: false,
     }));
@@ -45,7 +51,7 @@ export function HandProvider({ children }: { children: ReactNode }) {
       street: 'preflop',
       currentPosition: getActionOrder('preflop')[0],
       players,
-      pot: 1.5, // SB + BB
+      pot: POKER_CONFIG.blinds.sb + POKER_CONFIG.blinds.bb,
       actions: [],
     };
 

@@ -1,9 +1,10 @@
 import type { Position, Street, ActionRecord, BetSize, PlayerState } from '@/types/poker';
 import { getActionOrder, getActivePlayers } from './pokerUtils';
 import { calculateCurrentPot } from './potUtils';
+import { POKER_CONFIG } from '@/utils/pokerConfig';
 
-// 最小ベット額（通常はビッグブラインド）
-const MIN_BET = 1; // BB単位
+// STACK-RULE-001: 最小ベット額はPOKER_CONFIGから取得
+const MIN_BET = POKER_CONFIG.blinds.bb;
 
 /** THルール: ベットの最小額（BB）。プリフロップ最初のオープンは2BB、それ以外は1BB */
 export function getMinBet(street: Street, lastBet?: number): number {
@@ -116,12 +117,12 @@ function trackStreetBettingState(actions: ActionRecord[], street: Street): {
 
   const contributions = new Map<string, number>();
   if (street === 'preflop') {
-    contributions.set('SB', 0.5);
-    contributions.set('BB', 1);
+    contributions.set('SB', POKER_CONFIG.blinds.sb);
+    contributions.set('BB', POKER_CONFIG.blinds.bb);
   }
 
-  let currentBet = street === 'preflop' ? 1 : 0;
-  let minRaiseSize = 1; // 1BB minimum
+  let currentBet: number = street === 'preflop' ? POKER_CONFIG.blinds.bb : 0;
+  let minRaiseSize: number = POKER_CONFIG.blinds.bb;
   let lastAggressionIsFullRaise = false;
 
   for (const action of streetActions) {

@@ -143,6 +143,13 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
           {history.length > 0 && (
             <div className="flex flex-row gap-1.5">
               <a
+                href="intent://gemini.google.com/app#Intent;scheme=https;package=com.google.android.apps.bard;end"
+                className="inline-flex items-center px-2.5 py-1.5 bg-p5-red text-white font-bold text-xs border border-white/30 font-p5-en"
+                style={{ clipPath: 'polygon(4% 0%, 100% 0%, 96% 100%, 0% 100%)' }}
+              >
+                Gemini App
+              </a>
+              <a
                 href="https://gemini.google.com/app"
                 target="_blank"
                 rel="noopener noreferrer"
@@ -151,19 +158,10 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
               >
                 Gemini Web
               </a>
-              <a
-                href="https://gemini.google.com/app"
-                target="_top"
-                rel="noopener noreferrer"
-                className="inline-flex items-center px-2.5 py-1.5 bg-black text-white font-bold text-xs border border-white/30 font-p5-en"
-                style={{ clipPath: 'polygon(4% 0%, 100% 0%, 96% 100%, 0% 100%)' }}
-              >
-                Gemini App
-              </a>
               {canShare && (
                 <button
                   type="button"
-                  className="px-2.5 py-1.5 bg-p5-red text-white font-bold text-xs border border-white/30 font-p5-en"
+                  className="px-2.5 py-1.5 bg-black text-white font-bold text-xs border border-white/30 font-p5-en"
                   style={{ clipPath: 'polygon(4% 0%, 100% 0%, 96% 100%, 0% 100%)' }}
                   onClick={() => navigator.share({ title: 'Poker Hands', url: 'https://gemini.google.com/app' }).catch(() => {})}
                 >
@@ -405,6 +403,13 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
                                 <span className="font-p5-en">Select All &amp; Copy</span>
                               </motion.button>
                               <a
+                                href="intent://gemini.google.com/app#Intent;scheme=https;package=com.google.android.apps.bard;end"
+                                className="inline-flex items-center px-2.5 py-1.5 bg-p5-red text-white font-bold text-xs border border-white/30 font-p5-en"
+                                style={{ clipPath: 'polygon(4% 0%, 100% 0%, 96% 100%, 0% 100%)' }}
+                              >
+                                App
+                              </a>
+                              <a
                                 href="https://gemini.google.com/app"
                                 target="_blank"
                                 rel="noopener noreferrer"
@@ -413,19 +418,10 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
                               >
                                 Web
                               </a>
-                              <a
-                                href="https://gemini.google.com/app"
-                                target="_top"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center px-2.5 py-1.5 bg-black text-white font-bold text-xs border border-white/30 font-p5-en"
-                                style={{ clipPath: 'polygon(4% 0%, 100% 0%, 96% 100%, 0% 100%)' }}
-                              >
-                                App
-                              </a>
                               {canShare && (
                                 <button
                                   type="button"
-                                  className="px-2.5 py-1.5 bg-p5-red text-white font-bold text-xs border border-white/30 font-p5-en"
+                                  className="px-2.5 py-1.5 bg-black text-white font-bold text-xs border border-white/30 font-p5-en"
                                   style={{ clipPath: 'polygon(4% 0%, 100% 0%, 96% 100%, 0% 100%)' }}
                                   onClick={() => navigator.share({ title: 'Poker Hand', text: generateHandExport(hand) }).catch(() => {})}
                                 >

@@ -46,7 +46,9 @@ describe('Poker Logic Tests - Texas Hold\'em 6-max', () => {
       });
 
       result.current.gameState?.players.forEach((player) => {
-        expect(player.stack).toBe(100);
+        // BUG-28: ブラインド控除済み (SB=99.5, BB=99, others=100)
+        const expected = player.position === 'SB' ? 99.5 : player.position === 'BB' ? 99 : 100;
+        expect(player.stack).toBe(expected);
       });
     });
 

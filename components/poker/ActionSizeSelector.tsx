@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import type { Action, BetSize, Position } from '@/types/poker';
 import { getAvailableActions, getForcedAction, getMinBet, calculateMinRaise } from '@/utils/bettingUtils';
 import { useHand } from '@/contexts/HandContext';
+import { POKER_CONFIG } from '@/utils/pokerConfig';
 import { useEffect, useState } from 'react';
 
 interface ActionSizeSelectorProps {
@@ -98,7 +99,7 @@ export default function ActionSizeSelector({ position, onSelect }: ActionSizeSel
   const amounts = betOrRaiseItem?.sizes?.map((s) => s.amount ?? 0).filter((a) => a > 0) ?? [];
   const hasPresetSizes = amounts.length > 0;
   const player = gameState?.players.find((p) => p.position === position);
-  const stack = player?.stack ?? 100;
+  const stack = player?.stack ?? POKER_CONFIG.defaultStack;
   const sliderMin =
     betOrRaiseItem?.action === 'raise' && gameState
       ? calculateMinRaise(gameState.actions, gameState.street, gameState.lastBet)
