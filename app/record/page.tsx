@@ -110,6 +110,18 @@ export default function RecordPage() {
   /** UI-6: メモ */
   const [memo, setMemo] = useState('');
 
+  // UI-53: TOP画面(start)表示時にhtml/bodyのスクロールを完全禁止
+  useEffect(() => {
+    if (step === 'start') {
+      document.documentElement.style.overflow = 'hidden';
+      document.body.style.overflow = 'hidden';
+    }
+    return () => {
+      document.documentElement.style.overflow = '';
+      document.body.style.overflow = '';
+    };
+  }, [step]);
+
   /** BUG-19: Push step to history stack */
   const pushStep = (newStep: Step) => {
     setStepHistory(prev => [...prev, newStep]);
@@ -424,7 +436,14 @@ export default function RecordPage() {
   const handleWinnerSelect = (winner: Position | Position[]) => {
     setSelectedWinner(winner);
     const winners = Array.isArray(winner) ? winner : [winner];
-    const losers = activePlayers.filter((p) => !winners.includes(p));
+    // BUG-33: fold-basedで敗者を判定（p.activeフラグに依存しない）
+    const foldedPos = gameState
+      ? new Set(gameState.actions.filter(a => a.action === 'fold').map(a => a.position))
+      : new Set<string>();
+    const nonFoldedPositions = gameState
+      ? gameState.players.filter(p => !foldedPos.has(p.position)).map(p => p.position)
+      : [];
+    const losers = nonFoldedPositions.filter((p) => !winners.includes(p));
     // 敗者のうちヒーロー以外のみ入力させる（ヒーローは既に heroHand で入力済み）
     const losersForInput = losers.filter((p) => p !== currentHand?.heroPosition);
     if (losersForInput.length === 0) {

@@ -8,7 +8,8 @@ const DEFAULT_INITIAL_STACK = POKER_CONFIG.defaultStack;
 /** このストリートでの各ポジションの投入額（BB単位）。プリフロはSB/BBのブラインドを含む */
 export function getContributionsThisStreet(
   actions: ActionRecord[],
-  street: Street
+  street: Street,
+  playerStacks?: Map<string, number>
 ): Map<string, number> {
   const contributions = new Map<string, number>();
   if (street === 'preflop') {
@@ -27,7 +28,14 @@ export function getContributionsThisStreet(
       contributions.set(pos, prev + amount);
       currentBet = Math.max(currentBet, prev + amount);
     } else if (action.action === 'call') {
-      const callAmount = Math.max(0, currentBet - prev);
+      let callAmount = Math.max(0, currentBet - prev);
+      // BUG-33: call時にスタック上限でキャップ（ショートスタックのコール過大計上を防止）
+      if (playerStacks) {
+        const stack = playerStacks.get(pos);
+        if (stack !== undefined) {
+          callAmount = Math.min(callAmount, stack);
+        }
+      }
       contributions.set(pos, prev + callAmount);
     }
   }
@@ -268,20 +276,25 @@ export function getTotalContributions(actions: ActionRecord[]): Map<string, numb
 export function calculateSidePots(actions: ActionRecord[], players: PlayerState[]): SidePot[] {
   const contributions = getTotalContributions(actions);
 
-  // アクティブプレイヤーのみ考慮（foldしたプレイヤーの投入額はポットに入るがeligibleでない）
-  const activePositions = players.filter(p => p.active).map(p => p.position);
+  // BUG-33: fold-basedでアクティブ判定（p.activeフラグに依存しない）
+  const foldedPositions = new Set(
+    actions.filter(a => a.action === 'fold').map(a => a.position)
+  );
+  const activePositions = players
+    .filter(p => !foldedPositions.has(p.position))
+    .map(p => p.position);
 
   // 全プレイヤーの投入額を取得（fold含む）
-  const allContribs: { position: Position; amount: number; active: boolean }[] =
+  const allContribs: { position: Position; amount: number; isActive: boolean }[] =
     players.map(p => ({
       position: p.position,
       amount: contributions.get(p.position) ?? 0,
-      active: p.active,
+      isActive: !foldedPositions.has(p.position),
     }));
 
   // アクティブプレイヤーの投入額でユニークなレベルをソート
   const activeLevels = [...new Set(
-    allContribs.filter(c => c.active).map(c => c.amount)
+    allContribs.filter(c => c.isActive).map(c => c.amount)
   )].sort((a, b) => a - b);
 
   if (activeLevels.length <= 1) {
@@ -307,8 +320,8 @@ export function calculateSidePots(actions: ActionRecord[], players: PlayerState[
     for (const c of allContribs) {
       const playerContribAtLevel = Math.min(c.amount, level) - Math.min(c.amount, previousLevel);
       potAmount += playerContribAtLevel;
-      // eligibleはこのレベル以上投入したアクティブプレイヤー
-      if (c.active && c.amount >= level) {
+      // BUG-33: eligibleはfold-basedでこのレベル以上投入したプレイヤー
+      if (c.isActive && c.amount >= level) {
         eligible.push(c.position);
       }
     }

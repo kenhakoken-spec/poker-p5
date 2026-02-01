@@ -42,6 +42,8 @@ describe('Side Pot Calculation', () => {
   describe('calculateSidePots', () => {
     it('no side pots when all players have equal contributions', () => {
       const actions: ActionRecord[] = [
+        mkAction('SB', 'fold'),
+        mkAction('BB', 'fold'),
         mkAction('UTG', 'bet', 10),
         mkAction('MP', 'call'),
       ];
@@ -61,6 +63,8 @@ describe('Side Pot Calculation', () => {
       // Player A has 50BB, Player B has 100BB
       // A goes all-in for 50, B calls
       const actions: ActionRecord[] = [
+        mkAction('SB', 'fold'),
+        mkAction('BB', 'fold'),
         mkAction('UTG', 'all-in', 50),
         mkAction('MP', 'call'),
       ];
@@ -80,6 +84,8 @@ describe('Side Pot Calculation', () => {
     it('3 players with different all-in amounts', () => {
       // A: all-in 20, B: all-in 50, C: call 50
       const actions: ActionRecord[] = [
+        mkAction('SB', 'fold'),
+        mkAction('BB', 'fold'),
         mkAction('UTG', 'all-in', 20),
         mkAction('MP', 'all-in', 50),
         mkAction('CO', 'call'),
@@ -111,6 +117,8 @@ describe('Side Pot Calculation', () => {
     it('fold + all-in scenario', () => {
       // UTG folds, MP all-in 30, CO calls
       const actions: ActionRecord[] = [
+        mkAction('SB', 'fold'),
+        mkAction('BB', 'fold'),
         mkAction('UTG', 'fold'),
         mkAction('MP', 'all-in', 30),
         mkAction('CO', 'call'),
@@ -134,6 +142,8 @@ describe('Side Pot Calculation', () => {
     it('all-in runout: all active players all-in', () => {
       // All 3 players all-in with different amounts
       const actions: ActionRecord[] = [
+        mkAction('SB', 'fold'),
+        mkAction('BB', 'fold'),
         mkAction('UTG', 'all-in', 10),
         mkAction('MP', 'all-in', 30),
         mkAction('CO', 'all-in', 50),
@@ -164,6 +174,9 @@ describe('Side Pot Calculation', () => {
 
     it('single active player gets entire pot', () => {
       const actions: ActionRecord[] = [
+        mkAction('MP', 'fold'),
+        mkAction('SB', 'fold'),
+        mkAction('BB', 'fold'),
         mkAction('UTG', 'bet', 3),
       ];
       const players: PlayerState[] = [
