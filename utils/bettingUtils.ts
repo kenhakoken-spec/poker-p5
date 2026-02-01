@@ -101,6 +101,121 @@ export function getPostflopBetSizes(
   return sizes;
 }
 
+// ======================================================================
+// BUG-14: TH準拠オールインロジック
+// ======================================================================
+
+/** ストリート内のベッティング状態を追跡（内部ヘルパー） */
+function trackStreetBettingState(actions: ActionRecord[], street: Street): {
+  currentBet: number;
+  minRaiseSize: number;
+  contributions: Map<string, number>;
+  lastAggressionIsFullRaise: boolean;
+} {
+  const streetActions = actions.filter(a => a.street === street);
+
+  const contributions = new Map<string, number>();
+  if (street === 'preflop') {
+    contributions.set('SB', 0.5);
+    contributions.set('BB', 1);
+  }
+
+  let currentBet = street === 'preflop' ? 1 : 0;
+  let minRaiseSize = 1; // 1BB minimum
+  let lastAggressionIsFullRaise = false;
+
+  for (const action of streetActions) {
+    const pos = action.position;
+    const prev = contributions.get(pos) ?? 0;
+
+    if (action.action === 'bet' || action.action === 'raise') {
+      const amount = action.size?.amount ?? 0;
+      const newLevel = prev + amount;
+      if (newLevel > currentBet) {
+        minRaiseSize = newLevel - currentBet;
+        currentBet = newLevel;
+        lastAggressionIsFullRaise = true;
+      }
+      contributions.set(pos, newLevel);
+    } else if (action.action === 'all-in') {
+      const amount = action.size?.amount ?? 0;
+      const newLevel = prev + amount;
+      if (newLevel > currentBet) {
+        const increment = newLevel - currentBet;
+        if (increment >= minRaiseSize) {
+          // フルレイズ相当のオールイン
+          minRaiseSize = increment;
+          currentBet = newLevel;
+          lastAggressionIsFullRaise = true;
+        } else {
+          // ショートオールイン（レイズ最低額未満）
+          currentBet = newLevel;
+          lastAggressionIsFullRaise = false;
+        }
+      } else {
+        // ベットレベルにも達しないオールイン（コール以下）
+        lastAggressionIsFullRaise = false;
+      }
+      contributions.set(pos, newLevel);
+    } else if (action.action === 'call') {
+      const callAmount = Math.max(0, currentBet - prev);
+      contributions.set(pos, prev + callAmount);
+    }
+  }
+
+  return { currentBet, minRaiseSize, contributions, lastAggressionIsFullRaise };
+}
+
+/** ルール1: オールイン済みプレイヤーはアクション不要 */
+export function shouldSkipPlayer(player: PlayerState): boolean {
+  return !player.active || player.isAllIn;
+}
+
+/** TH準拠: 現在のベットレベル（このストリートでマッチすべき額） */
+export function getCurrentBetLevel(actions: ActionRecord[], street: Street): number {
+  return trackStreetBettingState(actions, street).currentBet;
+}
+
+/** TH準拠: 最小レイズ増分（最後のフルレイズの増分） */
+export function getLastRaiseIncrement(actions: ActionRecord[], street: Street): number {
+  return trackStreetBettingState(actions, street).minRaiseSize;
+}
+
+/**
+ * ショートオールイン判定
+ * @param allInTotal オールイン後のプレイヤー合計投入額
+ * @param currentBetLevel 現在のベットレベル
+ * @param minRaiseSize 最小レイズ増分
+ */
+export function isShortAllIn(
+  allInTotal: number,
+  currentBetLevel: number,
+  minRaiseSize: number
+): boolean {
+  if (allInTotal <= currentBetLevel) return true;
+  return (allInTotal - currentBetLevel) < minRaiseSize;
+}
+
+/**
+ * ルール2/3: 最後のアグレッシブアクションがアクション再開を引き起こすか
+ * フルレイズ → true（全員に再アクション権）
+ * ショートオールイン → false（既アクション者にはリレイズ権なし）
+ */
+export function didLastAggressionReopenAction(actions: ActionRecord[], street: Street): boolean {
+  return trackStreetBettingState(actions, street).lastAggressionIsFullRaise;
+}
+
+/**
+ * ルール4: ランアウト判定
+ * アクティブ2人以上で、チップ保有者が0〜1人 → ランアウト
+ */
+export function isRunoutNeeded(players: PlayerState[]): boolean {
+  const activePlayers = players.filter(p => p.active);
+  if (activePlayers.length <= 1) return false;
+  const actingPlayers = activePlayers.filter(p => !p.isAllIn);
+  return actingPlayers.length <= 1;
+}
+
 // 利用可能なアクションを取得
 export function getAvailableActions(
   position: Position,
@@ -112,17 +227,20 @@ export function getAvailableActions(
 ): { action: string; sizes?: BetSize[] }[] {
   const player = players.find(p => p.position === position);
   if (!player || !player.active) return [];
-  
+
+  // ルール1: オールイン済みプレイヤーはアクション不要
+  if (player.isAllIn) return [];
+
   const available: { action: string; sizes?: BetSize[] }[] = [];
-  
+
   // フォールドは常に可能
   available.push({ action: 'fold' });
-  
+
   // チェック/コールの判定
   const streetActions = actions.filter(a => a.street === street);
   // BUG-12: all-inもbet/raiseとして扱う（オールイン後にcheck/betが出るのを防止）
   const hasBet = streetActions.some(a => a.action === 'bet' || a.action === 'raise' || a.action === 'all-in');
-  
+
   if (!hasBet) {
     available.push({ action: 'check' });
   } else {
@@ -130,11 +248,16 @@ export function getAvailableActions(
       available.push({ action: 'call' });
     }
   }
-  
+
+  // ルール5: 残り1人の制限チェック
+  const actingPlayers = players.filter(p => p.active && !p.isAllIn);
+  const isOnlyActingPlayer = actingPlayers.length === 1 && actingPlayers[0].position === position;
+  const isRestricted = isOnlyActingPlayer && hasBet;
+
   // ベット/レイズの判定
-  if (player.stack > 0) {
+  if (!isRestricted && player.stack > 0) {
     let sizes: BetSize[] = [];
-    
+
     if (street === 'preflop') {
       sizes = getPreflopBetSizes(player.stack, lastBet);
     } else {
@@ -148,7 +271,7 @@ export function getAvailableActions(
         }
       }
     }
-    
+
     if (sizes.length > 0) {
       if (hasBet) {
         available.push({ action: 'raise', sizes });
@@ -156,11 +279,16 @@ export function getAvailableActions(
         available.push({ action: 'bet', sizes });
       }
     }
-    
+
     // オールインは常に追加（スタックが0より大きい場合）
     available.push({ action: 'all-in' });
+  } else if (isRestricted && player.stack > 0) {
+    // 制限中: コール不足時のみオールイン可（コールオールイン）
+    if (hasBet && lastBet && player.stack < lastBet) {
+      available.push({ action: 'all-in' });
+    }
   }
-  
+
   return available;
 }
 
@@ -169,8 +297,8 @@ export function areAllPlayersAllIn(players: PlayerState[]): boolean {
   const activePlayers = players.filter(p => p.active);
   if (activePlayers.length === 0) return false;
   
-  // 全アクティブプレイヤーがスタック0（オールイン済み）か、スタックが0でないがアクション不可能
-  return activePlayers.every(p => p.stack === 0 || !p.active);
+  // 全アクティブプレイヤーがオールイン済み（BUG-14: !p.active は常にfalseだったバグを修正）
+  return activePlayers.every(p => p.isAllIn || p.stack === 0);
 }
 
 // 必然な選択肢を判定（フォールドしか選べない場合など）

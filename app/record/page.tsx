@@ -7,6 +7,7 @@ import type { Position, Action, BetSize, ActionRecord, Street, ShowdownHand, Pot
 import { getActivePlayers, getActingPlayers, getNextToAct, getActionOrder } from '@/utils/pokerUtils';
 import { getTotalContributions } from '@/utils/potUtils';
 import { getPreflopBetSizes } from '@/utils/bettingUtils';
+import { evaluateHand } from '@/utils/handEvaluator';
 import { getSelectablePositions, validateAction } from '@/utils/recordFlowValidation';
 import HeroSelector from '@/components/poker/HeroSelector';
 import PositionSelector from '@/components/poker/PositionSelector';
@@ -186,7 +187,9 @@ export default function RecordPage() {
     const order = getActionOrder('preflop');
     const afterOpener = order.slice(order.indexOf(preflopOpener) + 1);
     const acted = new Set(gameState.actions.filter((a) => a.street === 'preflop').map((a) => a.position));
-    const remaining = afterOpener.filter((p) => !acted.has(p));
+    // BUG-14: オールイン済みプレイヤーもremainingから除外
+    const allInPos = new Set(gameState.players.filter((p) => p.isAllIn && p.active).map((p) => p.position));
+    const remaining = afterOpener.filter((p) => !acted.has(p) && !allInPos.has(p));
     if (remaining.length === 0) setStep('position');
   }, [step, preflopOpener, preflopNextToAct, gameState]);
 
@@ -517,7 +520,7 @@ export default function RecordPage() {
             return (
               <P5Button
                 key={pos}
-                className={`py-3 px-2 font-black text-sm polygon-button w-full border-2 ${
+                className={`h-14 px-2 font-black text-sm polygon-button w-full border-2 flex flex-col items-center justify-center ${
                   isBBDisabled
                     ? 'bg-black/40 text-white/30 opacity-40 cursor-not-allowed border-white/30'
                     : isHero ? 'bg-p5-red/20 border-p5-red ring-2 ring-p5-red ring-offset-2 ring-offset-black' : 'bg-black border-white'
@@ -527,7 +530,7 @@ export default function RecordPage() {
                 disabled={isBBDisabled}
               >
                 {pos}
-                {isHero && !isBBDisabled && <span className="block text-[10px] text-p5-red font-bold mt-0.5">(You)</span>}
+                {isHero && !isBBDisabled && <span className="block text-[10px] text-p5-red font-bold">(You)</span>}
               </P5Button>
             );
           })}
@@ -559,11 +562,12 @@ export default function RecordPage() {
                 >
                   {openerForSheet} — Open size
                 </motion.h3>
+                {/* UI-23: Call=青白、Bet=赤、All-in=赤強調グロー（UI-3色分け統一） */}
                 <div className="flex flex-col gap-2">
                   <motion.button
                     type="button"
-                    className="w-full py-3 border-2 border-white font-black polygon-button bg-black text-white"
-                    style={{ transform: 'skewX(-7deg)' }}
+                    className="w-full min-h-[44px] py-3 border-2 border-blue-400/40 font-black polygon-button text-white"
+                    style={{ transform: 'skewX(-7deg)', background: 'rgba(200,200,255,0.15)' }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => handlePreflopWhoOpenConfirm(openerForSheet, 'call')}
                   >
@@ -573,8 +577,8 @@ export default function RecordPage() {
                     <motion.button
                       key={s.amount ?? 0}
                       type="button"
-                      className="w-full py-3 border-2 border-white font-black polygon-button bg-black text-white"
-                      style={{ transform: 'skewX(-7deg)' }}
+                      className="w-full min-h-[44px] py-3 border-2 border-red-400/60 font-black polygon-button text-red-200"
+                      style={{ transform: 'skewX(-7deg)', background: 'rgba(200,0,0,0.25)' }}
                       whileTap={{ scale: 0.95 }}
                       onClick={() => handlePreflopWhoOpenConfirm(openerForSheet, s)}
                     >
@@ -583,8 +587,8 @@ export default function RecordPage() {
                   ))}
                   <motion.button
                     type="button"
-                    className="w-full py-3 border-2 border-p5-red font-black polygon-button bg-p5-red text-white"
-                    style={{ transform: 'skewX(-7deg)' }}
+                    className="w-full min-h-[44px] py-3 border-2 border-red-500 font-black polygon-button text-white glow-red glow-red-text"
+                    style={{ transform: 'skewX(-7deg)', background: 'rgba(200,0,0,0.35)' }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => handlePreflopWhoOpenConfirm(openerForSheet, 'all-in')}
                   >
@@ -641,7 +645,11 @@ export default function RecordPage() {
     const acted = gameState
       ? new Set(gameState.actions.filter((a) => a.street === 'preflop').map((a) => a.position))
       : new Set<string>();
-    const selectable = afterOpener.filter((p) => !acted.has(p));
+    // BUG-14: オールイン済み + アクション済みプレイヤーを除外
+    const allInPositions = gameState
+      ? new Set(gameState.players.filter((p) => p.isAllIn && p.active).map((p) => p.position))
+      : new Set<string>();
+    const selectable = afterOpener.filter((p) => !acted.has(p) && !allInPositions.has(p));
 
     if (preflopNextToAct === null) {
       return (
@@ -667,7 +675,7 @@ export default function RecordPage() {
               return (
                 <P5Button
                   key={pos}
-                  className={`py-3 px-2 border-2 font-black text-sm polygon-button w-full ${
+                  className={`h-14 px-2 border-2 font-black text-sm polygon-button w-full flex flex-col items-center justify-center ${
                     isDisabled
                       ? 'bg-black/40 text-white/30 opacity-40 cursor-not-allowed border-white/30'
                       : isHero
@@ -679,7 +687,7 @@ export default function RecordPage() {
                   disabled={isDisabled}
                 >
                   {pos}
-                  {isHero && !isDisabled && <span className="block text-[10px] text-p5-red font-bold mt-0.5">(You)</span>}
+                  {isHero && !isDisabled && <span className="block text-[10px] text-p5-red font-bold">(You)</span>}
                 </P5Button>
               );
             })}
@@ -707,10 +715,11 @@ export default function RecordPage() {
           <p className="text-[10px] text-gray-400 mt-0.5">Call, Raise 2x/3x, or All-in</p>
         </div>
         <div className="flex-1 min-h-0 p-3 flex flex-col justify-center gap-2 overflow-auto">
+          {/* UI-23: Call=青白、Raise=赤、All-in=赤強調グロー（UI-3色分け統一） */}
           <motion.button
             type="button"
-            className="w-full py-3 border-2 border-white font-black text-base polygon-button bg-black text-white"
-            style={{ transform: 'skewX(-7deg)' }}
+            className="w-full min-h-[44px] py-3 border-2 border-blue-400/40 font-black text-base polygon-button text-white"
+            style={{ transform: 'skewX(-7deg)', background: 'rgba(200,200,255,0.15)' }}
             whileTap={{ scale: 0.95 }}
             onClick={() => handlePreflopOpponentsConfirm(preflopNextToAct, 'call')}
           >
@@ -720,8 +729,8 @@ export default function RecordPage() {
             <motion.button
               key={s.amount ?? 0}
               type="button"
-              className="w-full py-3 border-2 border-white font-black text-base polygon-button bg-black text-white"
-              style={{ transform: 'skewX(-7deg)' }}
+              className="w-full min-h-[44px] py-3 border-2 border-red-400/60 font-black text-base polygon-button text-red-200"
+              style={{ transform: 'skewX(-7deg)', background: 'rgba(200,0,0,0.25)' }}
               whileTap={{ scale: 0.95 }}
               onClick={() => handlePreflopOpponentsConfirm(preflopNextToAct, 'raise', s)}
             >
@@ -730,8 +739,8 @@ export default function RecordPage() {
           ))}
           <motion.button
             type="button"
-            className="w-full py-3 border-2 border-p5-red font-black text-base polygon-button bg-p5-red text-white"
-            style={{ transform: 'skewX(-7deg)' }}
+            className="w-full min-h-[44px] py-3 border-2 border-red-500 font-black text-base polygon-button text-white glow-red glow-red-text"
+            style={{ transform: 'skewX(-7deg)', background: 'rgba(200,0,0,0.35)' }}
             whileTap={{ scale: 0.95 }}
             onClick={() => handlePreflopOpponentsConfirm(preflopNextToAct, 'all-in')}
           >
@@ -1124,7 +1133,7 @@ export default function RecordPage() {
       </AnimatePresence>
 
       {/* B13: ヘッダー帯 + B10: ヒーロープレミアム */}
-      <div className="p-2 sm:p-3 border-b border-white/20 shrink-0 bg-black/80 space-y-1 header-sweep-bg">
+      <div className="px-2 py-1.5 border-b border-white/20 shrink-0 bg-black/80 space-y-0.5 header-sweep-bg">
         <div className="flex flex-wrap items-center justify-between gap-1">
           <PotDisplay compact />
           <span className="font-p5-en text-base sm:text-lg font-black text-p5-red glow-red-text" style={{ transform: 'skewX(-5deg)' }}>
@@ -1214,15 +1223,25 @@ export default function RecordPage() {
         <div className="p5-divider" />
       </div>
 
-      {/* ボードカード表示 */}
+      {/* ボードカード表示 + UI-24: 役名 */}
       {board.length > 0 && (step === 'position' || step === 'action') && (
         <motion.div
-          className="shrink-0 px-3 py-1.5 border-b border-white/10 bg-black/60"
+          className="shrink-0 px-2 py-1 border-b border-white/10 bg-black/60"
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ type: 'spring', stiffness: 300, damping: 20 }}
         >
-          <p className="font-p5-en text-[10px] text-gray-400 mb-1 text-center">BOARD</p>
+          <div className="flex items-center justify-center gap-2 mb-1">
+            <p className="font-p5-en text-[10px] text-gray-400">BOARD</p>
+            {heroHand && heroHand.length === 2 && board.length >= 3 && (() => {
+              const handName = evaluateHand(heroHand, board);
+              return handName ? (
+                <span className="font-p5-en text-[11px] font-bold text-p5-red" style={{ transform: 'skewX(-5deg)' }}>
+                  {handName}
+                </span>
+              ) : null;
+            })()}
+          </div>
           <div className="flex justify-center gap-2 items-end" style={{ perspective: '800px' }}>
             {board.map((c, i) => (
               <motion.span
@@ -1253,7 +1272,7 @@ export default function RecordPage() {
       <AnimatePresence mode="wait">
         <motion.div
           key={step + (selectedPosition ?? '')}
-          className="flex-1 min-h-0 overflow-hidden p-3 flex flex-col justify-center"
+          className="flex-1 min-h-0 overflow-hidden p-2 flex flex-col justify-center"
           initial={{ clipPath: 'polygon(100% 100%, 100% 100%, 100% 100%, 100% 100%)', opacity: 0 }}
           animate={{ clipPath: 'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)', opacity: 1 }}
           exit={{ clipPath: 'polygon(0% 0%, 0% 0%, 0% 0%, 0% 0%)', opacity: 0 }}

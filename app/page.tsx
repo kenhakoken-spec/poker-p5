@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import dynamic from 'next/dynamic';
 
 const RecordPage = dynamic(() => import('./record/page'), { ssr: false });
-const HistoryPage = dynamic(() => import('./history/page'), { ssr: false });
+const HistoryContent = dynamic(() => import('@/components/HistoryContent'), { ssr: false });
 
 type Tab = 'record' | 'history';
 
@@ -46,12 +46,7 @@ export default function Home() {
                 : 'text-gray-500 hover:text-gray-300'
             }`}
             style={{ height: '48px' }}
-            onClick={() => {
-              setActiveTab(tab.id);
-              if (tab.id === 'history') {
-                window.dispatchEvent(new CustomEvent('refreshHistory'));
-              }
-            }}
+            onClick={() => setActiveTab(tab.id)}
           >
             <span style={{ display: 'inline-block', transform: 'skewX(-7deg)' }}>
               {tab.label}
@@ -73,7 +68,7 @@ export default function Home() {
           <RecordPage />
         </div>
         <div className={`h-full overflow-y-auto ${activeTab === 'history' ? '' : 'hidden'}`}>
-          <HistoryPage />
+          <HistoryContent isActive={activeTab === 'history'} />
         </div>
       </div>
     </div>

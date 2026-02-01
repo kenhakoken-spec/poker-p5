@@ -85,7 +85,11 @@ export function HandProvider({ children }: { children: ReactNode }) {
     });
 
     const newPot = calculateCurrentPot(newActions);
-    const newLastBet = action.size?.amount || gameState.lastBet;
+    // BUG-14: Short all-in should not lower lastBet; use Math.max to prevent it
+    const actionAmount = action.size?.amount;
+    const newLastBet = actionAmount !== undefined
+      ? Math.max(actionAmount, gameState.lastBet ?? 0)
+      : gameState.lastBet;
 
     // サイドポット計算（all-inが発生した場合）
     const hasAllIn = updatedPlayers.some(p => p.isAllIn && p.active);
@@ -117,12 +121,15 @@ export function HandProvider({ children }: { children: ReactNode }) {
       }
     }
 
+    // BUG-14: ストリート遷移時はlastBetをリセット（新ストリートでは誰もベットしていない）
+    const finalLastBet = newStreet !== gameState.street ? undefined : newLastBet;
+
     const updatedState: GameState = {
       ...gameState,
       street: newStreet,
       players: updatedPlayers,
       pot: newPot,
-      lastBet: newLastBet,
+      lastBet: finalLastBet,
       actions: newActions,
       sidePots,
     };
@@ -162,7 +169,11 @@ export function HandProvider({ children }: { children: ReactNode }) {
         });
 
         const newPot = calculateCurrentPot(newActions);
-        const newLastBet = action.size?.amount ?? state.lastBet;
+        // BUG-14: Short all-in should not lower lastBet
+        const actionAmt = action.size?.amount;
+        const newLastBet = actionAmt !== undefined
+          ? Math.max(actionAmt, state.lastBet ?? 0)
+          : state.lastBet;
 
         // サイドポット計算
         const hasAllIn = updatedPlayers.some(p => p.isAllIn && p.active);
@@ -185,12 +196,14 @@ export function HandProvider({ children }: { children: ReactNode }) {
             newStreet = 'river';
           }
         }
+        // BUG-14: ストリート遷移時はlastBetをリセット
+        const finalLastBet = newStreet !== state.street ? undefined : newLastBet;
         state = {
           ...state,
           street: newStreet,
           players: updatedPlayers,
           pot: newPot,
-          lastBet: newLastBet,
+          lastBet: finalLastBet,
           actions: newActions,
           sidePots,
         };
