@@ -64,10 +64,10 @@ export function validateAction(
   gameState: GameState
 ): { valid: boolean; reason?: string } {
   if (!canAct(record.position, gameState.players, gameState.actions, gameState.street)) {
-    return { valid: false, reason: `${record.position} はこのタイミングでアクションできません` };
+    return { valid: false, reason: `${record.position} cannot act at this time` };
   }
   if (!isActionAllowed(record.position, record.action, record.size, gameState)) {
-    return { valid: false, reason: `このアクションは許可されていません` };
+    return { valid: false, reason: `This action is not allowed` };
   }
   return { valid: true };
 }

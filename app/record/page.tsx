@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useHand } from '@/contexts/HandContext';
 import type { Position, Action, BetSize, ActionRecord, Street, ShowdownHand, PotWinner } from '@/types/poker';
@@ -73,6 +73,9 @@ function P5Button({ children, className = '', style, onClick, disabled }: {
 export default function RecordPage() {
   const { gameState, currentHand, startNewHand, addAction, addActions, setBoardCards, setWinnerAndShowdown, finishHand, reset } = useHand();
   const [step, setStep] = useState<Step>('start');
+  // BUG-19: スタックベースのステップ履歴
+  const [stepHistory, setStepHistory] = useState<Step[]>(['start']);
+  const skipAutoRef = useRef(false);
   const [selectedPosition, setSelectedPosition] = useState<Position | null>(null);
   const [pendingBoardStreet, setPendingBoardStreet] = useState<BoardStreet | null>(null);
   const [selectedWinner, setSelectedWinner] = useState<Position | Position[] | null>(null);
@@ -98,6 +101,12 @@ export default function RecordPage() {
   const [confirmedPotWinners, setConfirmedPotWinners] = useState<PotWinner[]>([]);
   /** UI-6: メモ */
   const [memo, setMemo] = useState('');
+
+  /** BUG-19: Push step to history stack */
+  const pushStep = (newStep: Step) => {
+    setStepHistory(prev => [...prev, newStep]);
+    setStep(newStep);
+  };
 
   const activePlayers = gameState ? getActivePlayers(gameState.players) : [];
   const actingPlayers = gameState ? getActingPlayers(gameState.players) : [];
@@ -134,28 +143,30 @@ export default function RecordPage() {
 
   // BUG-8: ボード選択判定をboardLengthベースに（ランアウト時のストリート不整合を解消）
   useEffect(() => {
+    if (skipAutoRef.current) return;
     if (!gameState || step !== 'position') return;
     // プリフロップ中（street未進行）はボード選択不要
     if (gameState.street === 'preflop') return;
     if (boardLength < 3) {
       setPendingBoardStreet('flop');
-      setStep('selectBoard');
+      pushStep('selectBoard');
       return;
     }
     if (boardLength < 4) {
       setPendingBoardStreet('turn');
-      setStep('selectBoard');
+      pushStep('selectBoard');
       return;
     }
     if (boardLength < 5) {
       setPendingBoardStreet('river');
-      setStep('selectBoard');
+      pushStep('selectBoard');
       return;
     }
   }, [gameState, step, boardLength]);
 
   // リバー完了（ボード5枚・ラウンド閉鎖）時は「勝者」ステップへ遷移
   useEffect(() => {
+    if (skipAutoRef.current) return;
     if (!gameState || step !== 'position') return;
 
     // リバー完了条件: ストリートがriver && ボード5枚 && (次のアクターなし or 全員all-in)
@@ -165,23 +176,25 @@ export default function RecordPage() {
       (nextToAct === null || allPlayersAllIn);
 
     if (isRiverComplete) {
-      setStep('winner');
+      pushStep('winner');
     }
   }, [gameState, step, boardLength, nextToAct, activePlayers, allPlayersAllIn]);
 
   // UI-10: nextToAct確定時はポジション選択をスキップして直接アクションへ
   useEffect(() => {
+    if (skipAutoRef.current) return;
     if (step !== 'position' || !nextToAct || !gameState) return;
     // ボード選択が必要な場合はスキップしない
     if (gameState.street === 'flop' && boardLength < 3) return;
     if (gameState.street === 'turn' && boardLength < 4) return;
     if (gameState.street === 'river' && boardLength < 5) return;
     setSelectedPosition(nextToAct);
-    setStep('action');
+    pushStep('action');
   }, [step, nextToAct, gameState, boardLength]);
 
   // プリフロップ対向者: まだアクションしていないポジションがなければ position へ
   useEffect(() => {
+    if (skipAutoRef.current) return;
     if (step !== 'preflopOpponents' || preflopOpener === null || !gameState) return;
     if (preflopNextToAct !== null) return;
     const order = getActionOrder('preflop');
@@ -190,10 +203,15 @@ export default function RecordPage() {
     // BUG-14: オールイン済みプレイヤーもremainingから除外
     const allInPos = new Set(gameState.players.filter((p) => p.isAllIn && p.active).map((p) => p.position));
     const remaining = afterOpener.filter((p) => !acted.has(p) && !allInPos.has(p));
-    if (remaining.length === 0) setStep('position');
+    if (remaining.length === 0) pushStep('position');
   }, [step, preflopOpener, preflopNextToAct, gameState]);
 
-  const handleStart = () => setStep('hero');
+  // BUG-19: Clear Back navigation skip flag after auto-transition useEffects
+  useEffect(() => {
+    if (skipAutoRef.current) skipAutoRef.current = false;
+  });
+
+  const handleStart = () => pushStep('hero');
 
   const handleHeroSelect = (heroPosition: Position, heroHand?: [string, string]) => {
     const positions: Position[] = ['UTG', 'MP', 'CO', 'BTN', 'SB', 'BB'];
@@ -203,7 +221,7 @@ export default function RecordPage() {
     setPotWinnerMap(new Map());
     setConfirmedPotWinners([]);
     setMemo('');
-    setStep('preflopWhoOpen');
+    pushStep('preflopWhoOpen');
   };
 
   /** Who is Open でポジション＋アクション（Call / Bet 2x・3x / All-in）を選択したあと実行 */
@@ -235,7 +253,7 @@ export default function RecordPage() {
     addActions([...folds, openAction]);
     setWhoOpenSelectedPosition(null);
     setPreflopOpener(opener);
-    setStep('preflopOpponents');
+    pushStep('preflopOpponents');
   };
 
   /** プリフロで「次に動いた1ポジション」の Call / Raise 2x・3x / All-in を確定 */
@@ -264,7 +282,7 @@ export default function RecordPage() {
     addActions([...folds, mainAction]);
     setPreflopNextToAct(null);
     // プリフロップでは常に「次に動いたポジション」をユーザーに選ばせる（自動で進めない）
-    setStep('preflopOpponents');
+    pushStep('preflopOpponents');
   };
 
   const handlePositionSelect = (position: Position) => {
@@ -273,7 +291,7 @@ export default function RecordPage() {
     if (allowed.length > 0 && !allowed.includes(position)) return;
     setFlowError(null);
     setSelectedPosition(position);
-    setStep('action');
+    pushStep('action');
   };
 
   const handleActionSelect = (action: Action, size?: BetSize) => {
@@ -294,7 +312,7 @@ export default function RecordPage() {
         setSelectedPosition(correctNext);
         return;
       }
-      setFlowError(reason ?? '無効なアクションです');
+      setFlowError(reason ?? 'Invalid action');
       return;
     }
     setFlowError(null);
@@ -317,13 +335,13 @@ export default function RecordPage() {
     const acting = getActingPlayers(updatedPlayers);
 
     if (active.length <= 1) {
-      setTimeout(() => setStep('winner'), 300); // UI-21: 600→300
+      setTimeout(() => pushStep('winner'), 300); // UI-21: 600→300
       return;
     }
 
     // 全アクティブプレイヤーがall-in → ボード選択→勝者選択に直行（ランアウト）
     if (acting.length === 0) {
-      setTimeout(() => setStep('position'), 150); // UI-21: 300→150
+      setTimeout(() => pushStep('position'), 150); // UI-21: 300→150
       return;
     }
 
@@ -332,21 +350,22 @@ export default function RecordPage() {
     const preflopBets = preflopStreetActions.filter((a) => a.action === 'bet' || a.action === 'raise' || a.action === 'all-in');
     const isOpenerJustActed = preflopOpener !== null && gameState.street === 'preflop' && preflopBets.length === 1;
     if (isOpenerJustActed) {
-      setStep('preflopOpponents');
+      pushStep('preflopOpponents');
       return;
     }
 
-    // ポストフロップで次のプレイヤーが自明な場合は自動選択
+    // BUG-17: check→raise/all-in後もgetNextToActがcheckプレイヤーを正しく返す
+    // （lastAggressor以降で未応答のプレイヤーを探す設計のため、checkのみのプレイヤーにも再アクション機会がある）
     const currentStreetActions = newActions.filter((a) => a.street === gameState.street);
     const auto = getNextToAct(gameState.street, acting, currentStreetActions);
 
     if (auto !== null) {
       setTimeout(() => {
         setSelectedPosition(auto);
-        setStep('action');
+        pushStep('action');
       }, 150); // UI-21: 300→150
     } else {
-      setStep('position');
+      pushStep('position');
     }
   };
 
@@ -360,7 +379,7 @@ export default function RecordPage() {
 
     // 全員all-inの場合: アクション不要、次ストリートへ直行
     if (allPlayersAllIn) {
-      setStep('position'); // position→selectBoard→winnerへ自動進行
+      pushStep('position'); // position→selectBoard→winnerへ自動進行
       return;
     }
 
@@ -370,9 +389,9 @@ export default function RecordPage() {
 
     if (auto !== null) {
       setSelectedPosition(auto);
-      setStep('action');
+      pushStep('action');
     } else {
-      setStep('position');
+      pushStep('position');
     }
   };
 
@@ -384,7 +403,7 @@ export default function RecordPage() {
     const losersForInput = losers.filter((p) => p !== currentHand?.heroPosition);
     if (losersForInput.length === 0) {
       setWinnerAndShowdown(Array.isArray(winner) ? winner : [winner]);
-      setStep('result');
+      pushStep('result');
       return;
     }
     setWinnerAndShowdown(Array.isArray(winner) ? winner : [winner]);
@@ -417,7 +436,7 @@ export default function RecordPage() {
       finalShowdownHands.length > 0 ? finalShowdownHands : undefined
     );
     setShowShowdownSheet(false);
-    setStep('result');
+    pushStep('result');
   };
 
   const setShowdownHand = (position: Position, hand: [string, string] | 'muck') => {
@@ -452,6 +471,8 @@ export default function RecordPage() {
   const handleTop = () => {
     reset();
     setStep('start');
+    setStepHistory(['start']);
+    skipAutoRef.current = true;
     setSelectedPosition(null);
     setPreflopOpener(null);
     setPreflopNextToAct(null);
@@ -465,33 +486,27 @@ export default function RecordPage() {
     setShowShowdownSheet(false);
   };
 
-  /** UI-35: Back — 直前のステップに戻る */
+  /** BUG-19: Back — スタックベースの戻り */
   const handleBack = () => {
-    switch (step) {
-      case 'hero': setStep('start'); break;
-      case 'preflopWhoOpen': setStep('hero'); break;
-      case 'preflopOpponents':
-        if (preflopNextToAct !== null) {
-          setPreflopNextToAct(null);
-        } else {
-          setStep('preflopWhoOpen');
-        }
-        break;
-      case 'action':
-        setSelectedPosition(null);
-        setStep('position');
-        break;
-      case 'selectBoard':
-        setPendingBoardStreet(null);
-        setStep('position');
-        break;
-      case 'winner': setStep('position'); break;
-      case 'result': setStep('winner'); break;
-      default: break;
+    if (stepHistory.length <= 1) return;
+
+    // preflopOpponents sub-state: アクション選択中なら選択をクリアするだけ
+    if (step === 'preflopOpponents' && preflopNextToAct !== null) {
+      setPreflopNextToAct(null);
+      return;
     }
+
+    // 現在ステップに応じたstate cleanup
+    if (step === 'action') setSelectedPosition(null);
+    if (step === 'selectBoard') setPendingBoardStreet(null);
+
+    skipAutoRef.current = true;
+    const newHistory = stepHistory.slice(0, -1);
+    setStepHistory(newHistory);
+    setStep(newHistory[newHistory.length - 1]);
   };
 
-  /** UI-35: Navigation overlay (fixed bottom-left) */
+  /** UI-35: Navigation overlay (fixed bottom-left) + UI-41: Back disabled state */
   const navOverlay = step !== 'start' ? (
     <div className="fixed bottom-2 left-2 z-30 flex gap-1.5">
       <button
@@ -505,7 +520,12 @@ export default function RecordPage() {
       <button
         type="button"
         onClick={handleBack}
-        className="px-2.5 py-1.5 text-[10px] font-p5-en font-bold text-white/50 border border-white/20 rounded bg-black/70 min-h-[32px]"
+        disabled={stepHistory.length <= 1}
+        className={`px-2.5 py-1.5 text-[10px] font-p5-en font-bold border rounded min-h-[32px] ${
+          stepHistory.length <= 1
+            ? 'text-white/20 border-white/10 bg-black/40 cursor-not-allowed'
+            : 'text-white/50 border-white/20 bg-black/70'
+        }`}
         style={{ transform: 'skewX(-5deg)' }}
       >
         Back
@@ -519,10 +539,10 @@ export default function RecordPage() {
   ];
 
   if (step === 'start') {
-    const titleText = 'ハンド記録開始';
+    const titleText = 'Record Hand';
     // UI-29: p-4を除去し、flex + justify-center + items-center + h-full で縦方向中央
     return (
-      <main className="h-full overflow-hidden bg-black text-white flex flex-col items-center justify-center">
+      <main className="min-h-screen overflow-hidden bg-black text-white flex flex-col items-center justify-center">
         <div className="flex justify-center flex-wrap gap-0.5 mb-4">
           {titleText.split('').map((char, i) => (
             <motion.span
@@ -546,7 +566,7 @@ export default function RecordPage() {
           whileTap={{ scale: 0.92 }}
           onClick={handleStart}
         >
-          開始
+          Start
         </motion.button>
       </main>
     );
@@ -670,7 +690,7 @@ export default function RecordPage() {
                     className="w-full py-2 text-xs font-bold text-white/80 border border-white/40 rounded"
                     onClick={() => setWhoOpenShowSlider((v) => !v)}
                   >
-                    {whoOpenShowSlider ? 'スライダーを閉じる' : 'スライダーでベットサイズを選ぶ'}
+                    {whoOpenShowSlider ? 'Close slider' : 'Choose bet size with slider'}
                   </button>
                   {whoOpenShowSlider && (
                     <div className="pt-2 pb-1 border-t border-white/20">
@@ -841,7 +861,7 @@ export default function RecordPage() {
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs font-bold text-p5-red" style={{ transform: 'skewX(-5deg)' }}>{(pendingBoardStreet ?? gameState?.street)?.toUpperCase()}</span>
             {activePlayers.length > 0 && (
-              <span className="text-xs text-white/90 font-bold">参加: {activePlayers.join(', ')}</span>
+              <span className="text-xs text-white/90 font-bold">In: {activePlayers.join(', ')}</span>
             )}
           </div>
         </div>
@@ -870,7 +890,7 @@ export default function RecordPage() {
         {gameState?.sidePots && gameState.sidePots.length > 1 ? (
           <>
             <h2 className="text-xl sm:text-2xl font-black text-center mb-4" style={{ transform: 'skewX(-7deg)' }}>
-              ポットごとに勝者を選択
+              Select winner for each pot
             </h2>
             <div className="flex flex-col gap-3 max-w-sm mx-auto w-full overflow-auto max-h-[55vh] px-1">
               {gameState.sidePots.map((pot, idx) => (
@@ -919,14 +939,14 @@ export default function RecordPage() {
                 animate={{ opacity: 1, y: 0 }}
                 onClick={handleSidePotConfirm}
               >
-                確定
+                Confirm
               </motion.button>
             )}
           </>
         ) : (
           <>
             <h2 className="text-2xl sm:text-3xl font-black text-center mb-4" style={{ transform: 'skewX(-7deg)' }}>
-              勝者は？
+              Who won?
             </h2>
             {/* BUG-16: winnerCandidatesでall-inプレイヤーも確実に表示 */}
             <div className="flex flex-wrap justify-center gap-3 max-w-sm">
@@ -975,9 +995,9 @@ export default function RecordPage() {
                 transition={{ type: 'spring', damping: 25, stiffness: 300 }}
               >
                 <h3 className="text-lg font-black mb-2" style={{ transform: 'skewX(-7deg)' }}>
-                  ショーダウン（オプション）
+                  Showdown (Optional)
                 </h3>
-                <p className="text-xs text-gray-400 mb-3">敗者のハンドはマック or 入力。スキップ可。</p>
+                <p className="text-xs text-gray-400 mb-3">Muck or enter loser&apos;s hand. You can skip.</p>
                 {showdownInputs.map(({ position, hand }) => {
                   const currentHandCards = hand !== 'muck' ? hand.filter(Boolean) : [];
                   const usedElsewhere = [
@@ -999,14 +1019,14 @@ export default function RecordPage() {
                           className={`px-3 py-1.5 text-sm font-bold border-2 rounded ${hand === 'muck' ? 'bg-p5-red border-white text-white' : 'bg-black border-white/50 text-white'}`}
                           onClick={() => setShowdownHand(position, 'muck')}
                         >
-                          マック
+                          Muck
                         </button>
                         <button
                           type="button"
                           className={`px-3 py-1.5 text-sm font-bold border-2 rounded ${hand !== 'muck' ? 'bg-p5-red border-white text-white' : 'bg-black border-white/50 text-white'}`}
                           onClick={() => setShowdownHand(position, ['', ''])}
                         >
-                          ハンド入力
+                          Enter Hand
                         </button>
                       </div>
                       {hand !== 'muck' && (
@@ -1038,14 +1058,14 @@ export default function RecordPage() {
                   whileTap={{ scale: 0.95 }}
                   onClick={handleShowdownDone}
                 >
-                  次へ
+                  Next
                 </motion.button>
                 <button
                   type="button"
                   className="mt-2 w-full text-sm text-gray-400"
                   onClick={() => setShowShowdownSheet(false)}
                 >
-                  閉じる
+                  Close
                 </button>
               </motion.div>
             </>
@@ -1151,7 +1171,7 @@ export default function RecordPage() {
           <textarea
             className="w-full bg-black border-2 border-p5-red/60 text-white text-sm p-3 rounded resize-none focus:border-p5-red focus:outline-none placeholder-gray-500"
             rows={2}
-            placeholder="メモ（場所、相手の特徴、思考プロセスなど）"
+            placeholder="Memo (location, opponent traits, thought process, etc.)"
             value={memo}
             onChange={(e) => setMemo(e.target.value)}
             style={{ transform: 'skewX(-2deg)' }}
@@ -1168,7 +1188,7 @@ export default function RecordPage() {
           transition={{ delay: 0.6 }}
           onClick={() => handleFinish(heroWon, displayAmount)}
         >
-          履歴へ
+          Save to History
         </motion.button>
 
         {/* UI-28: Next Hand ボタン — 保存して次のハンドを即開始 */}
@@ -1197,6 +1217,7 @@ export default function RecordPage() {
             }
             // タブ切替せず次のハンドへ
             setStep('hero');
+            setStepHistory(['hero']);
             setSelectedPosition(null);
             setPreflopOpener(null);
             setPreflopNextToAct(null);
@@ -1427,7 +1448,7 @@ export default function RecordPage() {
                     onClick={() => {
                       setFlowError(null);
                       setSelectedPosition(nextToAct);
-                      setStep('action');
+                      pushStep('action');
                     }}
                   >
                     SELECT {nextToAct}
@@ -1454,6 +1475,10 @@ export default function RecordPage() {
                   style={{ transform: 'skewX(-7deg)' }}
                 >
                   {selectedPosition}
+                  {/* UI-40: フロップ以降ヒーローアクション時にHERO表示 */}
+                  {selectedPosition === heroPosition && gameState?.street !== 'preflop' && (
+                    <span className="text-lg font-bold ml-2 opacity-80">HERO</span>
+                  )}
                 </span>
                 <span className="font-p5-en text-base text-gray-400 block mt-0.5" style={{ transform: 'skewX(-5deg)' }}>
                   ACTION

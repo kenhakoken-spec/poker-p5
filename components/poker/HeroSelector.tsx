@@ -105,7 +105,7 @@ export default function HeroSelector({ onSelect }: HeroSelectorProps) {
         {selectedPosition && (
           <>
             <motion.div
-              className="flex-1 min-h-0 flex flex-col overflow-auto pt-4"
+              className="flex-1 min-h-0 flex flex-col overflow-auto pt-4 pb-20"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
             >
@@ -117,7 +117,7 @@ export default function HeroSelector({ onSelect }: HeroSelectorProps) {
                     className="text-sm text-p5-red font-bold"
                     onClick={clearHand}
                   >
-                    やり直す
+                    Reset
                   </button>
                 )}
               </div>
@@ -215,16 +215,16 @@ export default function HeroSelector({ onSelect }: HeroSelectorProps) {
             </motion.div>
 
             {/* 開始: ハンド選択の下に配置（ポジション + カード2枚選択済みで有効） */}
-            <div className="shrink-0 pt-3 pb-4 px-4 bg-black border-t border-white/10" data-testid="hero-start-area">
+            <div className="fixed bottom-0 left-0 right-0 pt-3 pb-4 px-4 bg-black border-t border-white/10 z-30" data-testid="hero-start-area">
               <button
                 type="button"
                 className="w-full max-w-sm mx-auto py-4 bg-p5-red text-white font-black text-lg polygon-button block disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ transform: 'skewX(-10deg)' }}
                 onClick={handleConfirm}
                 disabled={!selectedPosition || !hand}
-                aria-label="開始"
+                aria-label="Start"
               >
-                開始
+                Start
               </button>
             </div>
           </>

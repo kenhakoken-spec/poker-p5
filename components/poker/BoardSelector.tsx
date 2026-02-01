@@ -36,20 +36,20 @@ export default function BoardSelector({ street, count, usedCards, previousBoard 
     setSelected([...selected, card]);
   };
 
-  const label = street === 'flop' ? 'フロップ 3枚' : street === 'turn' ? 'ターン 1枚' : 'リバー 1枚';
+  const label = street === 'flop' ? 'Flop (3 cards)' : street === 'turn' ? 'Turn (1 card)' : 'River (1 card)';
 
   return (
     <div className="flex flex-col h-full overflow-hidden flex-1 min-h-0">
       <div className="shrink-0 px-3 pt-2 pb-1 border-b border-white/20">
         <motion.h2 className="text-base font-black" style={{ transform: 'skewX(-7deg)' }}>
-          {label}を選んでください
+          Select {label}
         </motion.h2>
       </div>
 
       {/* 前ストリートのボードカード表示（ターン/リバー時） */}
       {previousBoard.length > 0 && (
         <div className="shrink-0 px-3 py-2 border-b border-white/10">
-          <p className="text-[10px] text-gray-400 mb-1">既出ボード:</p>
+          <p className="text-[10px] text-gray-400 mb-1">Previous Board:</p>
           <div className="flex justify-center gap-2">
             {previousBoard.map((c, i) => (
               <motion.span
@@ -138,7 +138,7 @@ export default function BoardSelector({ street, count, usedCards, previousBoard 
         whileTap={selected.length === count ? { scale: 0.95 } : undefined}
         onClick={() => selected.length === count && onConfirm(selected)}
       >
-        確定 ({selected.length}/{count})
+        Confirm ({selected.length}/{count})
       </motion.button>
     </div>
   );

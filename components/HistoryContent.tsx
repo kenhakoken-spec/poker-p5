@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { loadHistory, saveHistory } from '@/utils/storage';
 import { exportToGemini, generateHandExport } from '@/utils/gemini';
@@ -58,7 +58,7 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
   const [editingMemoId, setEditingMemoId] = useState<string | null>(null);
   const [memoText, setMemoText] = useState('');
   const [toast, setToast] = useState<string | null>(null);
-  const [copyText, setCopyText] = useState<string | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     setHistory(loadHistory());
@@ -104,33 +104,22 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
     setEditingMemoId(null);
   };
 
-  // BUG-15: コピー処理（clipboard API → execCommand fallback → 手動コピーモーダル）
-  const handleCopy = (hand: Hand) => {
-    const text = generateHandExport(hand);
-    const showSuccess = () => {
-      setToast('Copied! Paste in Gemini to analyze');
-      setTimeout(() => setToast(null), 3000);
-    };
-    const fallback = () => {
-      try {
-        const ta = document.createElement('textarea');
-        ta.value = text;
-        ta.style.position = 'fixed';
-        ta.style.left = '-9999px';
-        document.body.appendChild(ta);
-        ta.focus();
-        ta.select();
-        const ok = document.execCommand('copy');
-        document.body.removeChild(ta);
-        if (ok) { showSuccess(); return; }
-      } catch { /* ignore */ }
-      setCopyText(text);
-    };
-    if (navigator.clipboard?.writeText) {
-      navigator.clipboard.writeText(text).then(showSuccess).catch(fallback);
-    } else {
-      fallback();
-    }
+  // BUG-18: 同期的コピー処理（非同期API一切不使用）
+  const handleSelectAndCopy = () => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    ta.focus();
+    ta.select();
+    try {
+      const ok = document.execCommand('copy');
+      if (ok) {
+        setToast('Copied! Paste in Gemini to analyze');
+        setTimeout(() => setToast(null), 3000);
+        return;
+      }
+    } catch { /* ignore */ }
+    setToast('Text selected — long press to copy');
+    setTimeout(() => setToast(null), 3000);
   };
 
   return (
@@ -369,26 +358,35 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
                             </div>
                           )}
 
-                          {/* Copy & Gemini buttons (BUG-15: separated for Android compatibility) */}
-                          <div className="flex gap-2">
-                            <motion.button
-                              type="button"
-                              className="px-3 py-1 bg-p5-red text-white font-bold text-xs border border-white/30"
-                              style={{ clipPath: 'polygon(4% 0%, 100% 0%, 96% 100%, 0% 100%)' }}
-                              whileTap={{ scale: 0.95 }}
-                              onClick={() => handleCopy(hand)}
-                            >
-                              <span className="font-p5-en">Copy</span>
-                            </motion.button>
-                            <motion.button
-                              type="button"
-                              className="px-3 py-1 bg-black text-white font-bold text-xs border border-white/30"
-                              style={{ clipPath: 'polygon(4% 0%, 100% 0%, 96% 100%, 0% 100%)' }}
-                              whileTap={{ scale: 0.95 }}
-                              onClick={() => window.open('https://gemini.google.com/app', '_blank')}
-                            >
-                              <span className="font-p5-en">Gemini</span>
-                            </motion.button>
+                          {/* BUG-18: Hand export textarea (always visible) + sync copy + <a> link */}
+                          <div className="space-y-1.5">
+                            <textarea
+                              ref={textareaRef}
+                              className="w-full bg-black border border-white/20 text-white text-[10px] p-2 rounded resize-none focus:outline-none font-mono"
+                              rows={5}
+                              readOnly
+                              value={generateHandExport(hand)}
+                            />
+                            <div className="flex gap-2">
+                              <motion.button
+                                type="button"
+                                className="px-3 py-1.5 bg-p5-red text-white font-bold text-xs border border-white/30"
+                                style={{ clipPath: 'polygon(4% 0%, 100% 0%, 96% 100%, 0% 100%)' }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={handleSelectAndCopy}
+                              >
+                                <span className="font-p5-en">Select All &amp; Copy</span>
+                              </motion.button>
+                              <a
+                                href="https://gemini.google.com/app"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center px-3 py-1.5 bg-black text-white font-bold text-xs border border-white/30 font-p5-en"
+                                style={{ clipPath: 'polygon(4% 0%, 100% 0%, 96% 100%, 0% 100%)' }}
+                              >
+                                Open Gemini
+                              </a>
+                            </div>
                           </div>
                         </div>
                       </motion.div>
@@ -400,44 +398,6 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
           </div>
         )}
       </div>
-
-      {/* Manual copy modal (BUG-15: fallback when clipboard API fails) */}
-      <AnimatePresence>
-        {copyText && (
-          <motion.div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setCopyText(null)}
-          >
-            <motion.div
-              className="bg-gray-900 border border-white/20 p-4 mx-4 max-w-md w-full"
-              style={{ clipPath: 'polygon(2% 0%, 100% 0%, 98% 100%, 0% 100%)' }}
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              onClick={e => e.stopPropagation()}
-            >
-              <p className="font-p5-en text-sm text-white mb-2">Select & Copy manually:</p>
-              <textarea
-                className="w-full bg-black border border-white/20 text-white text-xs p-2 rounded resize-none focus:outline-none"
-                rows={8}
-                readOnly
-                value={copyText}
-                onClick={e => (e.target as HTMLTextAreaElement).select()}
-                autoFocus
-              />
-              <button
-                className="mt-2 font-p5-en text-xs text-gray-400 hover:text-white"
-                onClick={() => setCopyText(null)}
-              >
-                Close
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Toast notification */}
       <AnimatePresence>

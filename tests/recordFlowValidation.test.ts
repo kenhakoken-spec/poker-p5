@@ -117,7 +117,7 @@ describe('Record flow validation', () => {
       };
       const { valid, reason } = validateAction(record, result.current.gameState!);
       expect(valid).toBe(false);
-      expect(reason).toContain('このタイミングでアクションできません');
+      expect(reason).toContain('cannot act at this time');
     });
   });
 });

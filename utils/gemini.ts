@@ -3,7 +3,7 @@ import { loadHistory } from './storage';
 import { calculateCurrentPot, getPotAfterEachAction } from './potUtils';
 
 const GEMINI_PROMPT_SINGLE =
-  'テキサスホールデムにおいて以下のアクションをもとにフラットにアドバイスをしてほしい。';
+  'Based on the following Texas Hold\'em actions, please provide straightforward coaching advice.';
 
 /** TH準拠の1アクション行（ストリート・ポジション・アクション・額・その時点のポット） */
 export interface THActionRow {
@@ -56,47 +56,27 @@ export function generateHandExport(hand: Hand): string {
   return `${GEMINI_PROMPT_SINGLE}\n\n${JSON.stringify(handForExport, null, 2)}`;
 }
 
-// クリップボードにコピー
-export async function copyToClipboard(text: string): Promise<boolean> {
+// BUG-18: 同期的コピー（execCommand使用、非同期API不使用）
+export function syncCopyText(text: string): boolean {
   try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch (error) {
-    console.error('Failed to copy to clipboard:', error);
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  } catch {
     return false;
   }
 }
 
-// Gemini Web/Appを起動
-export function launchGemini(text: string): void {
-  // Gemini WebのURL
-  const geminiUrl = `https://gemini.google.com/app`;
-  
-  // 新しいウィンドウで開く
-  window.open(geminiUrl, '_blank');
-  
-  // テキストをクリップボードにコピー
-  copyToClipboard(text);
-}
-
-// Gemini統合（エクスポート + 自動コピー + 起動）
-export async function exportToGemini(): Promise<void> {
+// Export All: 同期コピー + Gemini URL（aタグ経由を推奨するが後方互換のため残す）
+export function exportToGemini(): void {
   const exportText = generateGeminiExport();
-  const copied = await copyToClipboard(exportText);
-  if (copied) {
-    launchGemini(exportText);
-  } else {
-    alert('クリップボードへのコピーに失敗しました');
-  }
-}
-
-// 単一ハンドをコピーしてGeminiを起動（Copy＆Gem）
-export async function exportHandToGemini(hand: Hand): Promise<void> {
-  const exportText = generateHandExport(hand);
-  const copied = await copyToClipboard(exportText);
-  if (copied) {
-    window.open('https://gemini.google.com/app', '_blank');
-  } else {
-    alert('クリップボードへのコピーに失敗しました');
-  }
+  syncCopyText(exportText);
+  window.open('https://gemini.google.com/app', '_blank');
 }
