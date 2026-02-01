@@ -280,6 +280,8 @@ export default function RecordPage() {
       street: 'preflop' as Street,
       timestamp: Date.now(),
     }));
+    // BUG-43: opener all-in にもスタック額を size として付与
+    const openerStack = gameState.players.find(p => p.position === opener)?.stack ?? POKER_CONFIG.defaultStack;
     const openAction: ActionRecord =
       openSize === 'call'
         ? {
@@ -293,7 +295,9 @@ export default function RecordPage() {
             action: openSize === 'all-in' ? ('all-in' as Action) : ('bet' as Action),
             street: 'preflop' as Street,
             timestamp: Date.now(),
-            ...(openSize !== 'all-in' && { size: openSize }),
+            ...(openSize === 'all-in'
+              ? { size: { type: 'bet-relative' as const, value: 0, amount: openerStack } }
+              : { size: openSize }),
           };
     addActions([...folds, openAction]);
     setWhoOpenSelectedPosition(null);
@@ -620,6 +624,13 @@ export default function RecordPage() {
     </div>
   ) : null;
 
+  /** BUG-41三: バージョン表示を全ステップで固定表示（ビューポート内最下部中央） */
+  const versionOverlay = (
+    <div className="fixed bottom-1 left-0 right-0 z-10 text-center pointer-events-none">
+      <span className="text-xs font-p5-en text-white/40">v{pkg.version}</span>
+    </div>
+  );
+
   const usedCardsForBoard = [
     ...(currentHand?.heroHand ?? []),
     ...(gameState?.board ?? []),
@@ -657,10 +668,8 @@ export default function RecordPage() {
             Start
           </motion.button>
         </div>
-        {/* UI-51: バージョン表示を最下部中央に配置（mt-auto効果でflex末尾） */}
-        <div className="shrink-0 text-center pb-4">
-          <span className="text-[10px] font-p5-en text-white/30">v{pkg.version}</span>
-        </div>
+        {/* BUG-41三: バージョン表示は versionOverlay（fixed配置）に移行 */}
+        {versionOverlay}
       </main>
     );
   }
@@ -670,6 +679,7 @@ export default function RecordPage() {
       <main className="h-[100dvh] overflow-hidden bg-black text-white flex flex-col">
         <HeroSelector onSelect={handleHeroSelect} />
         {navOverlay}
+        {versionOverlay}
       </main>
     );
   }
@@ -686,6 +696,7 @@ export default function RecordPage() {
     return (
       <main className="h-[100dvh] overflow-hidden bg-black text-white flex flex-col relative">
         <div className="shrink-0 px-3 pt-2 pb-1 border-b border-white/20">
+          <PotDisplay compact />
           <motion.h2
             className="font-p5-en text-lg font-black whitespace-nowrap"
             style={{ transform: 'skewX(-7deg)' }}
@@ -820,6 +831,7 @@ export default function RecordPage() {
           )}
         </AnimatePresence>
         {navOverlay}
+        {versionOverlay}
       </main>
     );
   }
@@ -851,6 +863,7 @@ export default function RecordPage() {
     return (
       <main className="h-[100dvh] overflow-hidden bg-black text-white flex flex-col relative">
         <div className="shrink-0 px-3 pt-2 pb-1 border-b border-white/20">
+          <PotDisplay compact />
           <motion.h2
             className="font-p5-en text-lg font-black whitespace-nowrap"
             style={{ transform: 'skewX(-7deg)' }}
@@ -1001,6 +1014,7 @@ export default function RecordPage() {
           )}
         </AnimatePresence>
         {navOverlay}
+        {versionOverlay}
       </main>
     );
   }
@@ -1035,6 +1049,7 @@ export default function RecordPage() {
           />
         </div>
         {navOverlay}
+        {versionOverlay}
       </main>
     );
   }
@@ -1236,6 +1251,7 @@ export default function RecordPage() {
           )}
         </AnimatePresence>
         {navOverlay}
+        {versionOverlay}
       </main>
     );
   }
@@ -1426,6 +1442,7 @@ export default function RecordPage() {
           NEXT HAND
         </motion.button>
         {navOverlay}
+        {versionOverlay}
       </main>
     );
   }
@@ -1699,6 +1716,7 @@ export default function RecordPage() {
         </div>
       </div>
       {navOverlay}
+      {versionOverlay}
     </main>
   );
 }

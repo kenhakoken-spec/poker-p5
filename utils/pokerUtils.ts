@@ -11,12 +11,6 @@ export function getActionOrder(street: Street): Position[] {
   return street === 'preflop' ? PREFLOP_POSITIONS : POSTFLOP_POSITIONS;
 }
 
-// このストリートで最初にアクションするポジションを取得
-export function getFirstToAct(street: Street, activePlayers: Position[]): Position | null {
-  const order = getActionOrder(street);
-  return order.find((p) => activePlayers.includes(p)) ?? null;
-}
-
 // このストリートでまだアクションしていないポジションのうち次にアクションするポジション
 // bet/raise後は、アグレッサー以降で未応答のプレイヤーに再アクション機会を与える
 export function getNextToAct(

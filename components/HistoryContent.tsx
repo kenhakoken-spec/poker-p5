@@ -138,7 +138,7 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
             <a
               href="https://gemini.google.com/app"
               target="_blank"
-              rel="noopener noreferrer"
+              rel="noopener"
               style={{
                 display: 'inline-block',
                 padding: '6px 10px',
@@ -380,7 +380,7 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
                             <a
                               href="https://gemini.google.com/app"
                               target="_blank"
-                              rel="noopener noreferrer"
+                              rel="noopener"
                               style={{
                                 display: 'inline-block',
                                 padding: '6px 10px',

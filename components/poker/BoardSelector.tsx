@@ -122,24 +122,26 @@ export default function BoardSelector({ street, count, usedCards, previousBoard 
           selected={selected}
           onSelect={handleTap}
           isSelectable={(card) => !usedCards.includes(card) && (selected.includes(card) || selected.length < count)}
-          className="flex-1 min-h-0 overflow-y-auto"
+          className="flex-1 min-h-0 overflow-y-auto pb-20"
         />
       </div>
 
-      {/* 確定ボタン — BUG-5: 視覚的disabled表示 */}
-      <motion.button
-        className={`shrink-0 mt-2 py-4 font-black polygon-button w-full ${
-          selected.length === count
-            ? 'bg-p5-red text-white'
-            : 'bg-gray-700 text-gray-500 cursor-not-allowed'
-        }`}
-        style={{ transform: 'skewX(-7deg)' }}
-        disabled={selected.length !== count}
-        whileTap={selected.length === count ? { scale: 0.95 } : undefined}
-        onClick={() => selected.length === count && onConfirm(selected)}
-      >
-        Confirm ({selected.length}/{count})
-      </motion.button>
+      {/* 確定ボタン — BUG-40: fixed bottom-0 でビューポート最下部に固定配置 */}
+      <div className="fixed bottom-0 left-0 right-0 pt-3 pb-4 px-4 bg-black border-t border-white/10 z-30">
+        <motion.button
+          className={`w-full max-w-sm mx-auto py-4 font-black polygon-button block ${
+            selected.length === count
+              ? 'bg-p5-red text-white'
+              : 'bg-gray-700 text-gray-500 cursor-not-allowed'
+          }`}
+          style={{ transform: 'skewX(-7deg)' }}
+          disabled={selected.length !== count}
+          whileTap={selected.length === count ? { scale: 0.95 } : undefined}
+          onClick={() => selected.length === count && onConfirm(selected)}
+        >
+          Confirm ({selected.length}/{count})
+        </motion.button>
+      </div>
     </div>
   );
 }

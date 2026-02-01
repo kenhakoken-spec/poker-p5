@@ -62,7 +62,12 @@ export function HandProvider({ children }: { children: ReactNode }) {
   const addAction = useCallback((action: ActionRecord) => {
     if (!currentHand || !gameState) return;
 
-    const newActions = [...currentHand.actions, action];
+    // BUG-43: all-in で size 未設定の場合、アクションレコードにスタック全額を補完
+    const fixedAction = (action.action === 'all-in' && action.size?.amount === undefined)
+      ? { ...action, size: { type: 'bet-relative' as const, value: 0, amount: gameState.players.find(p => p.position === action.position)?.stack ?? 0 } }
+      : action;
+
+    const newActions = [...currentHand.actions, fixedAction];
     const updatedHand = { ...currentHand, actions: newActions };
 
     // ゲームステートを更新（コール額はこのストリートの最大投入額−自分の投入額で算出）
@@ -70,29 +75,29 @@ export function HandProvider({ children }: { children: ReactNode }) {
     const maxContribBefore = getMaxContributionThisStreet(currentHand.actions, gameState.street);
 
     const updatedPlayers = gameState.players.map((player) => {
-      if (player.position === action.position) {
-        if (action.action === 'fold') {
+      if (player.position === fixedAction.position) {
+        if (fixedAction.action === 'fold') {
           return { ...player, active: false };
         }
         let newStack = player.stack;
-        if (action.action === 'bet' || action.action === 'raise' || action.action === 'all-in') {
-          if (action.size?.amount !== undefined) {
-            newStack = Math.max(0, player.stack - action.size.amount);
+        if (fixedAction.action === 'bet' || fixedAction.action === 'raise' || fixedAction.action === 'all-in') {
+          if (fixedAction.size?.amount !== undefined) {
+            newStack = Math.max(0, player.stack - fixedAction.size.amount);
           }
-        } else if (action.action === 'call') {
-          const myContribBefore = contributionsBefore.get(action.position) ?? 0;
+        } else if (fixedAction.action === 'call') {
+          const myContribBefore = contributionsBefore.get(fixedAction.position) ?? 0;
           const amountToCall = Math.max(0, maxContribBefore - myContribBefore);
           newStack = Math.max(0, player.stack - amountToCall);
         }
-        const isAllIn = action.action === 'all-in' || newStack <= 0;
-        return { ...player, stack: newStack, lastAction: action.action, isAllIn };
+        const isAllIn = fixedAction.action === 'all-in' || newStack <= 0;
+        return { ...player, stack: newStack, lastAction: fixedAction.action, isAllIn };
       }
       return player;
     });
 
     const newPot = calculateCurrentPot(newActions);
     // BUG-14: Short all-in should not lower lastBet; use Math.max to prevent it
-    const actionAmount = action.size?.amount;
+    const actionAmount = fixedAction.size?.amount;
     const newLastBet = actionAmount !== undefined
       ? Math.max(actionAmount, gameState.lastBet ?? 0)
       : gameState.lastBet;
@@ -150,33 +155,38 @@ export function HandProvider({ children }: { children: ReactNode }) {
       let hand = currentHand;
       let state = gameState;
       for (const action of actions) {
+        // BUG-43: all-in で size 未設定の場合、アクションレコードにスタック全額を補完
+        const fa = (action.action === 'all-in' && action.size?.amount === undefined)
+          ? { ...action, size: { type: 'bet-relative' as const, value: 0, amount: state.players.find(pl => pl.position === action.position)?.stack ?? 0 } }
+          : action;
+
         const contribBefore = getContributionsThisStreet(hand.actions, state.street);
         const maxContribBefore = getMaxContributionThisStreet(hand.actions, state.street);
-        const newActions = [...hand.actions, action];
+        const newActions = [...hand.actions, fa];
         hand = { ...hand, actions: newActions };
 
         const updatedPlayers = state.players.map((p) => {
-          if (p.position !== action.position) return p;
-          if (action.action === 'fold') {
+          if (p.position !== fa.position) return p;
+          if (fa.action === 'fold') {
             return { ...p, active: false };
           }
           let newStack = p.stack;
-          if (action.action === 'bet' || action.action === 'raise' || action.action === 'all-in') {
-            if (action.size?.amount !== undefined) {
-              newStack = Math.max(0, p.stack - action.size.amount);
+          if (fa.action === 'bet' || fa.action === 'raise' || fa.action === 'all-in') {
+            if (fa.size?.amount !== undefined) {
+              newStack = Math.max(0, p.stack - fa.size.amount);
             }
-          } else if (action.action === 'call') {
-            const myContribBefore = contribBefore.get(action.position) ?? 0;
+          } else if (fa.action === 'call') {
+            const myContribBefore = contribBefore.get(fa.position) ?? 0;
             const amountToCall = Math.max(0, maxContribBefore - myContribBefore);
             newStack = Math.max(0, p.stack - amountToCall);
           }
-          const isAllIn = action.action === 'all-in' || newStack <= 0;
-          return { ...p, stack: newStack, lastAction: action.action, isAllIn };
+          const isAllIn = fa.action === 'all-in' || newStack <= 0;
+          return { ...p, stack: newStack, lastAction: fa.action, isAllIn };
         });
 
         const newPot = calculateCurrentPot(newActions);
         // BUG-14: Short all-in should not lower lastBet
-        const actionAmt = action.size?.amount;
+        const actionAmt = fa.size?.amount;
         const newLastBet = actionAmt !== undefined
           ? Math.max(actionAmt, state.lastBet ?? 0)
           : state.lastBet;
