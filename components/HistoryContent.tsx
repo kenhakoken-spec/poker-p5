@@ -312,22 +312,6 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
                         className="overflow-hidden"
                       >
                         <div className="px-3 pb-3 pt-1.5 border-t border-white/10 space-y-2">
-                          {/* Hero hand & Board */}
-                          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
-                            {hand.heroHand && hand.heroHand.length > 0 && (
-                              <span>
-                                <span className="text-gray-500">Hand:</span>{' '}
-                                <span className="font-bold text-white">{hand.heroHand.join(' ')}</span>
-                              </span>
-                            )}
-                            {hand.board && hand.board.length > 0 && (
-                              <span>
-                                <span className="text-gray-500">Board:</span>{' '}
-                                <span className="font-bold text-white">{hand.board.join(' ')}</span>
-                              </span>
-                            )}
-                          </div>
-
                           {/* Actions by street */}
                           {STREET_ORDER.map(st => {
                             const acts = streets[st];

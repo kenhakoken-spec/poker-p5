@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useHand } from '@/contexts/HandContext';
 import type { Position, Action, BetSize, ActionRecord, Street, ShowdownHand, PotWinner } from '@/types/poker';
 import { getActivePlayers, getActingPlayers, getNextToAct, getActionOrder } from '@/utils/pokerUtils';
-import { getTotalContributions } from '@/utils/potUtils';
+import { getTotalContributions, getContributionsThisStreet, getMaxContributionThisStreet } from '@/utils/potUtils';
 import { getPreflopBetSizes } from '@/utils/bettingUtils';
 import { evaluateHand } from '@/utils/handEvaluator';
 import { getSelectablePositions, validateAction } from '@/utils/recordFlowValidation';
@@ -341,6 +341,16 @@ export default function RecordPage() {
         let newStack = p.stack;
         if (action === 'all-in' || (size?.amount !== undefined && size.amount >= p.stack)) {
           newStack = 0;
+        } else if (action === 'call') {
+          const contributions = getContributionsThisStreet(gameState.actions, gameState.street);
+          const myContrib = contributions.get(selectedPosition) ?? 0;
+          const maxContrib = getMaxContributionThisStreet(gameState.actions, gameState.street);
+          const callAmount = Math.max(0, maxContrib - myContrib);
+          newStack = Math.max(0, p.stack - callAmount);
+        } else if (action === 'bet' || action === 'raise') {
+          if (size?.amount !== undefined) {
+            newStack = Math.max(0, p.stack - size.amount);
+          }
         }
         return { ...p, isAllIn: action === 'all-in' || newStack <= 0 };
       }
@@ -567,34 +577,38 @@ export default function RecordPage() {
     const titleText = 'Record Hand';
     // UI-29: p-4を除去し、flex + justify-center + items-center + h-full で縦方向中央
     return (
-      <main className="min-h-[100dvh] overflow-hidden bg-black text-white flex flex-col items-center justify-center">
-        <div className="flex justify-center flex-wrap gap-0.5 mb-4">
-          {titleText.split('').map((char, i) => (
-            <motion.span
-              key={i}
-              className="text-4xl sm:text-6xl font-black inline-block"
-              style={{ transform: 'skewX(-7deg)' }}
-              initial={{ opacity: 0, y: 50, rotate: -180 }}
-              animate={{ opacity: 1, y: 0, rotate: 0 }}
-              transition={{ delay: i * 0.05, type: 'spring', stiffness: 300, damping: 15 }}
-            >
-              {char === ' ' ? '\u00A0' : char}
-            </motion.span>
-          ))}
+      <main className="h-[100dvh] overflow-hidden bg-black text-white flex flex-col">
+        <div className="flex-1 flex flex-col items-center justify-center">
+          <div className="flex justify-center flex-wrap gap-0.5 mb-4">
+            {titleText.split('').map((char, i) => (
+              <motion.span
+                key={i}
+                className="text-4xl sm:text-6xl font-black inline-block"
+                style={{ transform: 'skewX(-7deg)' }}
+                initial={{ opacity: 0, y: 50, rotate: -180 }}
+                animate={{ opacity: 1, y: 0, rotate: 0 }}
+                transition={{ delay: i * 0.05, type: 'spring', stiffness: 300, damping: 15 }}
+              >
+                {char === ' ' ? '\u00A0' : char}
+              </motion.span>
+            ))}
+          </div>
+          <motion.button
+            className="px-10 py-5 bg-p5-red text-white font-bold text-xl polygon-button"
+            style={{ transform: 'skewX(-7deg)' }}
+            initial={{ opacity: 0, scale: 0 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: titleText.length * 0.05 + 0.2, type: 'spring' }}
+            whileTap={{ scale: 0.92 }}
+            onClick={handleStart}
+          >
+            Start
+          </motion.button>
         </div>
-        <motion.button
-          className="px-10 py-5 bg-p5-red text-white font-bold text-xl polygon-button"
-          style={{ transform: 'skewX(-7deg)' }}
-          initial={{ opacity: 0, scale: 0 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: titleText.length * 0.05 + 0.2, type: 'spring' }}
-          whileTap={{ scale: 0.92 }}
-          onClick={handleStart}
-        >
-          Start
-        </motion.button>
-        {/* UI-49: バージョン表示を最下部中央に配置 */}
-        <span className="mt-6 text-[10px] font-p5-en text-white/30 text-center w-full">v{pkg.version}</span>
+        {/* UI-51: バージョン表示を最下部中央に配置（mt-auto効果でflex末尾） */}
+        <div className="text-center pb-4">
+          <span className="text-[10px] font-p5-en text-white/30">v{pkg.version}</span>
+        </div>
       </main>
     );
   }
