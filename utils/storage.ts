@@ -32,11 +32,3 @@ export function addHand(hand: Hand): void {
   history.push(hand);
   saveHistory(history);
 }
-
-export function clearHistory(): void {
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-  } catch (error) {
-    console.error('Failed to clear history:', error);
-  }
-}
