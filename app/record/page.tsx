@@ -110,12 +110,10 @@ export default function RecordPage() {
   /** UI-6: メモ */
   const [memo, setMemo] = useState('');
 
-  // UI-53: TOP画面(start)表示時にhtml/bodyのスクロールを完全禁止
+  // UI-53 + UI-58: 全画面でhtml/bodyのスクロールを完全禁止（ヒストリーは別ルート）
   useEffect(() => {
-    if (step === 'start') {
-      document.documentElement.style.overflow = 'hidden';
-      document.body.style.overflow = 'hidden';
-    }
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
     return () => {
       document.documentElement.style.overflow = '';
       document.body.style.overflow = '';
@@ -282,8 +280,8 @@ export default function RecordPage() {
     pushStep('preflopOpponents');
   };
 
-  /** プリフロで「次に動いた1ポジション」の Call / Raise 2x・3x / All-in を確定 */
-  const handlePreflopOpponentsConfirm = (nextPosition: Position, action: 'call' | 'raise' | 'all-in', raiseSize?: BetSize) => {
+  /** プリフロで「次に動いた1ポジション」の Fold / Call / Raise 2x・3x / All-in を確定 */
+  const handlePreflopOpponentsConfirm = (nextPosition: Position, action: 'fold' | 'call' | 'raise' | 'all-in', raiseSize?: BetSize) => {
     if (!gameState || !currentHand || preflopOpener === null) return;
     const order = getActionOrder('preflop');
     const openerIndex = order.indexOf(preflopOpener);
@@ -299,7 +297,7 @@ export default function RecordPage() {
     const stack = gameState.players.find((p) => p.position === nextPosition)?.stack ?? POKER_CONFIG.defaultStack;
     const mainAction: ActionRecord = {
       position: nextPosition,
-      action: action === 'call' ? ('call' as Action) : action === 'all-in' ? ('all-in' as Action) : ('raise' as Action),
+      action: action === 'fold' ? ('fold' as Action) : action === 'call' ? ('call' as Action) : action === 'all-in' ? ('all-in' as Action) : ('raise' as Action),
       street: 'preflop' as Street,
       timestamp: Date.now(),
       ...(action === 'raise' && raiseSize && { size: raiseSize }),
@@ -372,7 +370,21 @@ export default function RecordPage() {
     const acting = getActingPlayers(updatedPlayers);
 
     if (active.length <= 1) {
-      setTimeout(() => pushStep('winner'), 300); // UI-21: 600→300
+      // BUG-36: 全員フォールドで1人残り→勝者自動決定、winner画面スキップ
+      const foldedInNewActions = new Set(
+        newActions.filter(a => a.action === 'fold').map(a => a.position)
+      );
+      const remaining = gameState.players
+        .filter(p => !foldedInNewActions.has(p.position))
+        .map(p => p.position);
+      if (remaining.length === 1) {
+        const autoWinner = remaining[0];
+        setSelectedWinner(autoWinner);
+        setWinnerAndShowdown([autoWinner]);
+        setTimeout(() => pushStep('result'), 300);
+      } else {
+        setTimeout(() => pushStep('winner'), 300);
+      }
       return;
     }
 
@@ -634,10 +646,10 @@ export default function RecordPage() {
 
   if (step === 'hero') {
     return (
-      <>
+      <main className="h-[100dvh] overflow-hidden bg-black text-white flex flex-col">
         <HeroSelector onSelect={handleHeroSelect} />
         {navOverlay}
-      </>
+      </main>
     );
   }
 
@@ -651,7 +663,7 @@ export default function RecordPage() {
     const openSizes = openerForSheet ? getPreflopBetSizes(stackForOpener, undefined) : [];
 
     return (
-      <main className="min-h-[100dvh] overflow-hidden bg-black text-white flex flex-col relative">
+      <main className="h-[100dvh] overflow-hidden bg-black text-white flex flex-col relative">
         <div className="shrink-0 px-3 pt-2 pb-1 border-b border-white/20">
           <motion.h2
             className="font-p5-en text-lg font-black whitespace-nowrap"
@@ -816,7 +828,7 @@ export default function RecordPage() {
 
     // UI-43: ポジション選択グリッド + せり上がりボトムシート（preflopWhoOpenと統一）
     return (
-      <main className="min-h-[100dvh] overflow-hidden bg-black text-white flex flex-col relative">
+      <main className="h-[100dvh] overflow-hidden bg-black text-white flex flex-col relative">
         <div className="shrink-0 px-3 pt-2 pb-1 border-b border-white/20">
           <motion.h2
             className="font-p5-en text-lg font-black whitespace-nowrap"
@@ -883,6 +895,16 @@ export default function RecordPage() {
                   {opponentForSheet}{opponentForSheet === currentHand?.heroPosition ? ' (You)' : ''} — Action
                 </motion.h3>
                 <div className="flex flex-col gap-2">
+                  {/* BUG-35: Foldボタン追加 */}
+                  <motion.button
+                    type="button"
+                    className="w-full min-h-[44px] py-3 border-2 border-gray-500/40 font-black polygon-button text-gray-300"
+                    style={{ transform: 'skewX(-7deg)', background: 'rgba(100,100,100,0.15)' }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => handlePreflopOpponentsConfirm(opponentForSheet, 'fold')}
+                  >
+                    Fold
+                  </motion.button>
                   <motion.button
                     type="button"
                     className="w-full min-h-[44px] py-3 border-2 border-blue-400/40 font-black polygon-button text-white"
@@ -972,7 +994,7 @@ export default function RecordPage() {
       : [];
     
     return (
-      <main className="min-h-[100dvh] overflow-hidden bg-black text-white flex flex-col">
+      <main className="h-[100dvh] overflow-hidden bg-black text-white flex flex-col">
         <div className="p-1.5 border-b border-white/20 flex flex-wrap items-center justify-between gap-1 shrink-0 bg-black/80">
           <PotDisplay compact />
           <div className="flex items-center gap-2 flex-wrap">
@@ -1006,7 +1028,7 @@ export default function RecordPage() {
       ? gameState.players.filter(p => !foldedPositions.has(p.position)).map(p => p.position)
       : [];
     return (
-      <main className="min-h-[100dvh] overflow-hidden bg-black text-white flex flex-col items-center justify-center p-4 relative">
+      <main className="h-[100dvh] overflow-hidden bg-black text-white flex flex-col items-center justify-center p-4 relative">
         {/* A5: サイドポット対応勝者選択 */}
         {gameState?.sidePots && gameState.sidePots.length > 1 ? (
           <>
@@ -1229,7 +1251,7 @@ export default function RecordPage() {
     const displayAmount = Math.round(heroProfit * 10) / 10;
 
     return (
-      <main className="min-h-[100dvh] overflow-hidden bg-black text-white p-4 flex flex-col items-center justify-center relative">
+      <main className="h-[100dvh] overflow-hidden bg-black text-white p-4 flex flex-col items-center justify-center relative">
         {/* 背景演出 */}
         <motion.div
           className="absolute inset-0 pointer-events-none"
@@ -1256,7 +1278,7 @@ export default function RecordPage() {
         />
 
         <motion.h1
-          className={`font-p5-en text-5xl sm:text-7xl font-black mb-3 text-center relative z-10 ${heroWon ? 'glow-red-text' : ''}`}
+          className={`font-p5-en text-5xl sm:text-7xl font-black mb-2 text-center relative z-10 ${heroWon ? 'glow-red-text' : ''}`}
           style={{
             transform: 'skewX(-7deg)',
             color: heroWon ? '#D50000' : '#fff',
@@ -1268,6 +1290,34 @@ export default function RecordPage() {
         >
           {heroWon ? 'VICTORY' : 'DEFEAT'}
         </motion.h1>
+
+        {/* UI-55: 勝者名 + HEROバッジ */}
+        <motion.div
+          className="flex items-center justify-center gap-2 mb-3 relative z-10"
+          style={{ transform: 'skewX(-5deg)' }}
+          initial={{ opacity: 0, x: -100 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.15, type: 'spring', stiffness: 200, damping: 15 }}
+        >
+          <span className="font-p5-en text-lg sm:text-xl font-bold text-white/80">
+            {(() => {
+              const winners = Array.isArray(selectedWinner) ? selectedWinner : selectedWinner ? [selectedWinner] : [];
+              if (winners.length === 0) return '';
+              return winners.length === 1
+                ? `${winners[0]} wins!`
+                : `${winners.join(', ')} win!`;
+            })()}
+          </span>
+          {(() => {
+            const winners = Array.isArray(selectedWinner) ? selectedWinner : selectedWinner ? [selectedWinner] : [];
+            const heroIsWinner = currentHand?.heroPosition && winners.includes(currentHand.heroPosition);
+            return heroIsWinner ? (
+              <span className="px-2 py-0.5 bg-p5-red text-white text-xs font-black rounded" style={{ transform: 'skewX(-5deg)' }}>
+                HERO
+              </span>
+            ) : null;
+          })()}
+        </motion.div>
 
         <motion.p
           className={`font-p5-en text-3xl sm:text-5xl font-black mb-4 text-center relative z-10 ${heroWon ? 'text-white' : 'text-gray-400'}`}
@@ -1371,7 +1421,7 @@ export default function RecordPage() {
   };
 
   return (
-    <main className="min-h-[100dvh] overflow-hidden bg-black text-white flex flex-col relative">
+    <main className="h-[100dvh] overflow-hidden bg-black text-white flex flex-col relative">
       {/* B6: ストリート遷移バナー */}
       <AnimatePresence>
         {streetBanner && (

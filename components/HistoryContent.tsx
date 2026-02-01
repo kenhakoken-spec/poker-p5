@@ -135,15 +135,14 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
         {/* Controls */}
         <div className="flex items-center gap-2 mb-4">
           {history.length > 0 && (
-            <a
-              href="https://gemini.google.com/app"
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              type="button"
               className="inline-flex items-center px-2.5 py-1.5 bg-p5-red text-white font-bold text-xs border border-white/30 font-p5-en"
               style={{ clipPath: 'polygon(4% 0%, 100% 0%, 96% 100%, 0% 100%)' }}
+              onClick={() => window.open('https://gemini.google.com/app', '_blank', 'noopener,noreferrer')}
             >
               Open Gemini Web
-            </a>
+            </button>
           )}
           <motion.button
             className={`px-4 py-1.5 font-bold text-xs border ${
@@ -303,74 +302,79 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
                             );
                           })}
 
-                          {/* Memo section */}
-                          {isEditingMemo ? (
-                            <div className="space-y-1.5">
-                              <textarea
-                                className="w-full bg-gray-900 border border-white/20 text-white text-xs p-2 rounded resize-none focus:outline-none focus:border-p5-red"
-                                rows={3}
-                                value={memoText}
-                                onChange={e => setMemoText(e.target.value)}
-                                autoFocus
-                              />
-                              <div className="flex gap-2">
+                          {/* UI-56: Memo section with label and visual container */}
+                          <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-3">
+                            <div className="font-p5-en text-[10px] text-p5-red font-bold uppercase tracking-wider mb-1.5">
+                              Memo
+                            </div>
+                            {isEditingMemo ? (
+                              <div className="space-y-1.5">
+                                <textarea
+                                  className="w-full bg-gray-900 border border-white/20 text-white text-xs p-2 rounded resize-none focus:outline-none focus:border-p5-red"
+                                  rows={3}
+                                  value={memoText}
+                                  onChange={e => setMemoText(e.target.value)}
+                                  autoFocus
+                                />
+                                <div className="flex gap-2">
+                                  <button
+                                    className="font-p5-en text-xs text-p5-red font-bold hover:underline"
+                                    onClick={() => saveMemo(hand.id)}
+                                  >
+                                    Save
+                                  </button>
+                                  <button
+                                    className="text-xs text-gray-500 hover:text-gray-300"
+                                    onClick={() => setEditingMemoId(null)}
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div>
+                                {hand.memo ? (
+                                  <p className="text-xs text-white/80 mb-1.5">{hand.memo}</p>
+                                ) : (
+                                  <p className="text-xs text-gray-500 italic mb-1.5">No memo</p>
+                                )}
                                 <button
-                                  className="font-p5-en text-xs text-p5-red font-bold hover:underline"
-                                  onClick={() => saveMemo(hand.id)}
+                                  className="text-[11px] text-gray-600 hover:text-white transition-colors"
+                                  onClick={() => startEditMemo(hand)}
                                 >
-                                  Save
-                                </button>
-                                <button
-                                  className="text-xs text-gray-500 hover:text-gray-300"
-                                  onClick={() => setEditingMemoId(null)}
-                                >
-                                  Cancel
+                                  {hand.memo ? 'Edit memo' : '+ Add memo'}
                                 </button>
                               </div>
-                            </div>
-                          ) : (
-                            <div className="space-y-1">
-                              {hand.memo && (
-                                <p className="text-xs text-gray-400 italic">📝 {hand.memo}</p>
-                              )}
-                              <button
-                                className="text-[11px] text-gray-600 hover:text-white transition-colors"
-                                onClick={() => startEditMemo(hand)}
-                              >
-                                {hand.memo ? 'Edit memo' : '+ Add memo'}
-                              </button>
-                            </div>
-                          )}
+                            )}
+                          </div>
 
-                          {/* BUG-18: Hand export textarea (always visible) + sync copy + <a> link */}
-                          <div className="space-y-1.5">
+                          {/* UI-57: Hidden textarea for copy functionality + buttons */}
+                          <div className="flex gap-2">
                             <textarea
                               ref={textareaRef}
-                              className="w-full bg-black border border-white/20 text-white text-[10px] p-2 rounded resize-none focus:outline-none font-mono"
-                              rows={5}
                               readOnly
+                              tabIndex={-1}
                               value={generateHandExport(hand)}
+                              aria-hidden="true"
+                              style={{ position: 'fixed', left: '-9999px', opacity: 0 }}
                             />
-                            <div className="flex gap-2">
-                              <motion.button
-                                type="button"
-                                className="px-3 py-1.5 bg-p5-red text-white font-bold text-xs border border-white/30"
-                                style={{ clipPath: 'polygon(4% 0%, 100% 0%, 96% 100%, 0% 100%)' }}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={handleSelectAndCopy}
-                              >
-                                <span className="font-p5-en">Select All &amp; Copy</span>
-                              </motion.button>
-                              <a
-                                href="https://gemini.google.com/app"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center px-2.5 py-1.5 bg-p5-red text-white font-bold text-xs border border-white/30 font-p5-en"
-                                style={{ clipPath: 'polygon(4% 0%, 100% 0%, 96% 100%, 0% 100%)' }}
-                              >
-                                Open Gemini Web
-                              </a>
-                            </div>
+                            <motion.button
+                              type="button"
+                              className="px-3 py-1.5 bg-p5-red text-white font-bold text-xs border border-white/30"
+                              style={{ clipPath: 'polygon(4% 0%, 100% 0%, 96% 100%, 0% 100%)' }}
+                              whileTap={{ scale: 0.95 }}
+                              onClick={handleSelectAndCopy}
+                            >
+                              <span className="font-p5-en">Copy</span>
+                            </motion.button>
+                            <button
+                              type="button"
+                              className="inline-flex items-center px-2.5 py-1.5 bg-p5-red text-white font-bold text-xs border border-white/30 font-p5-en"
+                              style={{ clipPath: 'polygon(4% 0%, 100% 0%, 96% 100%, 0% 100%)' }}
+                              onClick={(e) => { e.stopPropagation(); window.open('https://gemini.google.com/app', '_blank', 'noopener,noreferrer'); }}
+                            >
+                              Open Gemini Web
+                            </button>
                           </div>
                         </div>
                       </motion.div>
