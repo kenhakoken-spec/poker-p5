@@ -251,89 +251,99 @@ export default function ActionSizeSelector({ position, onSelect }: ActionSizeSel
         )}
       </AnimatePresence>
 
-      {/* アクションエリア */}
-      <div
-        className="space-y-4 p-4 sm:p-8 max-h-[70vh] overflow-y-auto scroll-inertia"
-        style={{ scrollBehavior: 'smooth' }}
-      >
-        {availableActions.map((item, index) => {
-          if (item.action === 'bet' || item.action === 'raise') {
-            return (
-              <div key={item.action} className="space-y-2">
-                <p className="font-p5-en text-lg sm:text-xl font-bold mb-2 glow-red-text">
-                  {item.action === 'bet' ? 'BET' : 'RAISE'}
-                </p>
-                <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                  {item.sizes?.map((size, sizeIndex) => {
-                    const player = gameState?.players.find(p => p.position === position);
-                    const stack = player?.stack || 100;
-                    const isAllInSize = isAllIn(size, stack);
+      {/* UI-32/33/36: アクションエリア（横並びレイアウト） */}
+      <div className="space-y-2 p-3 sm:p-4">
+        {/* UI-32: FOLD + CHECK/CALL 横並び */}
+        {(() => {
+          const topRow = availableActions.filter(a =>
+            a.action === 'fold' || a.action === 'check' || a.action === 'call'
+          );
+          if (topRow.length === 0) return null;
+          return (
+            <div className="flex flex-row flex-nowrap gap-2">
+              {topRow.map((item) => {
+                const btnStyle = actionButtonStyle(item.action);
+                return (
+                  <motion.button
+                    key={item.action}
+                    className={`flex-1 min-h-[44px] px-3 py-2 font-p5-en font-bold text-base polygon-button border-2 ${btnStyle.border} ${btnStyle.text}`}
+                    style={{ transform: 'skewX(-7deg)', background: btnStyle.bg }}
+                    initial={{ opacity: 0, x: -15 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    whileTap={{ scale: 0.92 }}
+                    onClick={() => handleActionWithFeedback(item.action as Action)}
+                  >
+                    {actionLabel(item.action)}
+                  </motion.button>
+                );
+              })}
+            </div>
+          );
+        })()}
 
-                    const sizeStyle = actionButtonStyle(item.action);
+        {/* UI-33: BET/RAISE サイズボタン横並び */}
+        {betOrRaiseItem && betOrRaiseItem.sizes && betOrRaiseItem.sizes.length > 0 && (
+          <div>
+            <p className="font-p5-en text-sm font-bold mb-1 glow-red-text" style={{ transform: 'skewX(-5deg)' }}>
+              {betOrRaiseItem.action === 'bet' ? 'BET' : 'RAISE'}
+            </p>
+            <div className="flex flex-row flex-nowrap gap-2">
+              {betOrRaiseItem.sizes.map((size, sizeIndex) => {
+                const sizeStyle = actionButtonStyle(betOrRaiseItem.action);
+                const isAllInSize = isAllIn(size, stack);
+                return (
+                  <motion.button
+                    key={sizeIndex}
+                    className={`flex-1 min-w-0 min-h-[44px] px-2 py-2 font-p5-en font-bold text-sm whitespace-nowrap polygon-button border-2 ${sizeStyle.border} ${sizeStyle.text}`}
+                    style={{ transform: 'skewX(-7deg)', background: sizeStyle.bg }}
+                    initial={{ opacity: 0, x: -15 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: sizeIndex * 0.03 }}
+                    whileTap={{ scale: 0.92 }}
+                    onClick={() => {
+                      if (isAllInSize) handleAllInClick();
+                      else handleActionWithFeedback(betOrRaiseItem.action as Action, size);
+                    }}
+                  >
+                    {formatBetSize(size)}
+                  </motion.button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
-                    return (
-                      <motion.button
-                        key={sizeIndex}
-                        className={`px-4 py-3 sm:px-6 sm:py-4 font-p5-en font-bold text-base sm:text-xl polygon-button border-2 ${sizeStyle.border} ${sizeStyle.text}`}
-                        style={{ transform: 'skewX(-7deg)', background: sizeStyle.bg }}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: (index * 0.1) + (sizeIndex * 0.03) }}
-                        whileHover={{ scale: 1.1, rotate: -3 }}
-                        whileTap={{ scale: 0.92 }}
-                        onClick={() => {
-                          if (isAllInSize) {
-                            handleAllInClick();
-                          } else {
-                            handleActionWithFeedback(item.action as Action, size);
-                          }
-                        }}
-                      >
-                        {formatBetSize(size)}
-                      </motion.button>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          } else {
-            const isAllInAction = item.action === 'all-in';
-            const btnStyle = actionButtonStyle(item.action);
+        {/* ALL-IN フル幅 */}
+        {availableActions.some(a => a.action === 'all-in') && (() => {
+          const allInStyle = actionButtonStyle('all-in');
+          return (
+            <motion.button
+              className={`w-full min-h-[44px] px-3 py-2 font-p5-en font-bold text-base polygon-button border-2 ${allInStyle.border} ${allInStyle.text} ${allInStyle.extra}`}
+              style={{ transform: 'skewX(-7deg)', background: allInStyle.bg }}
+              initial={{ opacity: 0, x: -15 }}
+              animate={{ opacity: 1, x: 0 }}
+              whileTap={{ scale: 0.92 }}
+              onClick={handleAllInClick}
+            >
+              ALL-IN ({stack} BB)
+            </motion.button>
+          );
+        })()}
 
-            return (
-              <motion.button
-                key={item.action}
-                className={`w-full px-3 py-2 sm:px-4 sm:py-3 font-p5-en font-bold text-base sm:text-xl polygon-button border-2 ${btnStyle.border} ${btnStyle.text} ${btnStyle.extra}`}
-                style={{
-                  transform: 'skewX(-7deg)',
-                  background: btnStyle.bg,
-                  animation: !isAllInAction ? `idle-breathe 3s ease-in-out ${index * 0.2}s infinite` : undefined,
-                }}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: index * 0.03 }}
-                whileHover={{ scale: 1.1, rotate: -3 }}
-                whileTap={{ scale: 0.92 }}
-                onClick={() => handleActionWithFeedback(item.action as Action)}
-              >
-                {actionLabel(item.action)}
-              </motion.button>
-            );
-          }
-        })}
+        {/* UI-36: Slider (English) */}
         {hasSlider && (
           <>
             <button
               type="button"
-              className="w-full py-2 mt-2 text-xs font-bold text-white/80 border border-white/40 rounded"
+              className="w-full py-1.5 mt-1 text-xs font-bold text-white/80 border border-white/40 rounded"
               onClick={() => setShowBetSlider((v) => !v)}
             >
-              {showBetSlider ? 'スライダーを閉じる' : 'スライダーでベットサイズを選ぶ'}
+              {showBetSlider ? 'Close Slider' : 'Bet Size Slider'}
             </button>
             {showBetSlider && betOrRaiseItem && (
-              <div className="pt-2 pb-1 mt-2 border-t border-white/20">
+              <div className="pt-2 pb-1 border-t border-white/20">
                 <p className="text-[10px] text-gray-400 mb-1">
-                  {betOrRaiseItem.action === 'bet' ? 'BET' : 'RAISE'} (BB): {clampedSliderAmount} ({sliderMin}〜{sliderMax})
+                  {betOrRaiseItem.action === 'bet' ? 'BET' : 'RAISE'} (BB): {clampedSliderAmount} ({sliderMin}-{sliderMax})
                 </p>
                 <input
                   type="range"
@@ -345,7 +355,7 @@ export default function ActionSizeSelector({ position, onSelect }: ActionSizeSel
                 />
                 <motion.button
                   type="button"
-                  className="w-full py-3 mt-2 border-2 border-white font-p5-en font-black text-base polygon-button bg-black text-white"
+                  className="w-full py-2 mt-1 border-2 border-white font-p5-en font-black text-sm polygon-button bg-black text-white"
                   style={{ transform: 'skewX(-7deg)' }}
                   whileTap={{ scale: 0.95 }}
                   onClick={handleSliderBet}

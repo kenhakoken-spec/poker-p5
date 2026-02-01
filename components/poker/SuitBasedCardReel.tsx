@@ -43,7 +43,7 @@ export default function SuitBasedCardReel({
     <div className={`flex flex-col gap-px ${className}`} style={{ maxHeight: '100%' }}>
       <style>{`.suit-reel-scroll::-webkit-scrollbar{display:none}`}</style>
       {SUITS.map((suit, suitIndex) => (
-        <div key={suit.name} className="flex items-stretch shrink-0 min-h-0 flex-1">
+        <div key={suit.name} className="flex items-stretch shrink-0 min-h-0">
           {/* スート固定（左）+ B15赤インジケーター */}
           <div className="w-10 shrink-0 flex items-center justify-center pr-1 border-r border-white/20 relative">
             <motion.span

@@ -71,7 +71,7 @@ export default function PotDisplay({ compact }: PotDisplayProps) {
           animate={{ scale: 1 }}
           transition={{ type: 'spring', stiffness: 400, damping: 15 }}
         >
-          {isPostflop ? 'Total: ' : 'Pot: '}{total.toFixed(1)} BB
+          POT: {total.toFixed(1)} BB
         </motion.p>
       </AnimatePresence>
 
@@ -98,10 +98,9 @@ export default function PotDisplay({ compact }: PotDisplayProps) {
       )}
 
       {!compact && isPostflop && (before > 0 || thisStreet > 0) && (
-        <div className="font-p5-en text-sm text-gray-400 mt-1 space-y-0.5" style={{ transform: 'skewX(-5deg)' }}>
-          <p>Before: {before.toFixed(1)} BB</p>
-          <p>This street: +{thisStreet.toFixed(1)} BB</p>
-        </div>
+        <p className="font-p5-en text-sm text-gray-400 mt-0.5" style={{ transform: 'skewX(-5deg)' }}>
+          (prev: {before.toFixed(1)} + street: {thisStreet.toFixed(1)})
+        </p>
       )}
       {!compact && (
         <p className="font-p5-en text-xl text-gray-400 mt-2 glow-red-text" style={{ transform: 'skewX(-5deg)' }}>

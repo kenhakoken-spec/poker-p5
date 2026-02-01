@@ -71,7 +71,7 @@ function P5Button({ children, className = '', style, onClick, disabled }: {
 }
 
 export default function RecordPage() {
-  const { gameState, currentHand, startNewHand, addAction, addActions, setBoardCards, setWinnerAndShowdown, finishHand } = useHand();
+  const { gameState, currentHand, startNewHand, addAction, addActions, setBoardCards, setWinnerAndShowdown, finishHand, reset } = useHand();
   const [step, setStep] = useState<Step>('start');
   const [selectedPosition, setSelectedPosition] = useState<Position | null>(null);
   const [pendingBoardStreet, setPendingBoardStreet] = useState<BoardStreet | null>(null);
@@ -448,6 +448,71 @@ export default function RecordPage() {
     window.dispatchEvent(new CustomEvent('switchTab', { detail: 'history' }));
   };
 
+  /** UI-35: TOP — 記録開始画面に戻る */
+  const handleTop = () => {
+    reset();
+    setStep('start');
+    setSelectedPosition(null);
+    setPreflopOpener(null);
+    setPreflopNextToAct(null);
+    setWhoOpenSelectedPosition(null);
+    setSelectedWinner(null);
+    setFlowError(null);
+    setPendingBoardStreet(null);
+    setPotWinnerMap(new Map());
+    setConfirmedPotWinners([]);
+    setMemo('');
+    setShowShowdownSheet(false);
+  };
+
+  /** UI-35: Back — 直前のステップに戻る */
+  const handleBack = () => {
+    switch (step) {
+      case 'hero': setStep('start'); break;
+      case 'preflopWhoOpen': setStep('hero'); break;
+      case 'preflopOpponents':
+        if (preflopNextToAct !== null) {
+          setPreflopNextToAct(null);
+        } else {
+          setStep('preflopWhoOpen');
+        }
+        break;
+      case 'action':
+        setSelectedPosition(null);
+        setStep('position');
+        break;
+      case 'selectBoard':
+        setPendingBoardStreet(null);
+        setStep('position');
+        break;
+      case 'winner': setStep('position'); break;
+      case 'result': setStep('winner'); break;
+      default: break;
+    }
+  };
+
+  /** UI-35: Navigation overlay (fixed bottom-left) */
+  const navOverlay = step !== 'start' ? (
+    <div className="fixed bottom-2 left-2 z-30 flex gap-1.5">
+      <button
+        type="button"
+        onClick={handleTop}
+        className="px-2.5 py-1.5 text-[10px] font-p5-en font-bold text-white/50 border border-white/20 rounded bg-black/70 min-h-[32px]"
+        style={{ transform: 'skewX(-5deg)' }}
+      >
+        TOP
+      </button>
+      <button
+        type="button"
+        onClick={handleBack}
+        className="px-2.5 py-1.5 text-[10px] font-p5-en font-bold text-white/50 border border-white/20 rounded bg-black/70 min-h-[32px]"
+        style={{ transform: 'skewX(-5deg)' }}
+      >
+        Back
+      </button>
+    </div>
+  ) : null;
+
   const usedCardsForBoard = [
     ...(currentHand?.heroHand ?? []),
     ...(gameState?.board ?? []),
@@ -455,9 +520,10 @@ export default function RecordPage() {
 
   if (step === 'start') {
     const titleText = 'ハンド記録開始';
+    // UI-29: p-4を除去し、flex + justify-center + items-center + h-full で縦方向中央
     return (
-      <main className="h-full overflow-hidden bg-black text-white p-4 flex flex-col items-center justify-center">
-        <div className="flex justify-center flex-wrap gap-0.5 mb-3">
+      <main className="h-full overflow-hidden bg-black text-white flex flex-col items-center justify-center">
+        <div className="flex justify-center flex-wrap gap-0.5 mb-4">
           {titleText.split('').map((char, i) => (
             <motion.span
               key={i}
@@ -487,7 +553,12 @@ export default function RecordPage() {
   }
 
   if (step === 'hero') {
-    return <HeroSelector onSelect={handleHeroSelect} />;
+    return (
+      <>
+        <HeroSelector onSelect={handleHeroSelect} />
+        {navOverlay}
+      </>
+    );
   }
 
   if (step === 'preflopWhoOpen') {
@@ -635,6 +706,7 @@ export default function RecordPage() {
             </>
           )}
         </AnimatePresence>
+        {navOverlay}
       </main>
     );
   }
@@ -692,6 +764,7 @@ export default function RecordPage() {
               );
             })}
           </div>
+          {navOverlay}
         </main>
       );
     }
@@ -747,6 +820,7 @@ export default function RecordPage() {
             All-in ({stack} BB)
           </motion.button>
         </div>
+        {navOverlay}
       </main>
     );
   }
@@ -780,11 +854,16 @@ export default function RecordPage() {
             onConfirm={handleBoardConfirm}
           />
         </div>
+        {navOverlay}
       </main>
     );
   }
 
   if (step === 'winner') {
+    // BUG-16: all-inプレイヤーも勝者候補に確実に含める（active && (通常 || isAllIn)）
+    const winnerCandidates = gameState
+      ? gameState.players.filter(p => p.active).map(p => p.position)
+      : [];
     return (
       <main className="h-full overflow-hidden bg-black text-white flex flex-col items-center justify-center p-4 relative">
         {/* A5: サイドポット対応勝者選択 */}
@@ -849,15 +928,20 @@ export default function RecordPage() {
             <h2 className="text-2xl sm:text-3xl font-black text-center mb-4" style={{ transform: 'skewX(-7deg)' }}>
               勝者は？
             </h2>
+            {/* BUG-16: winnerCandidatesでall-inプレイヤーも確実に表示 */}
             <div className="flex flex-wrap justify-center gap-3 max-w-sm">
-              {activePlayers.map((pos) => {
+              {winnerCandidates.map((pos) => {
                 const isHero = pos === currentHand?.heroPosition;
+                const playerState = gameState?.players.find(p => p.position === pos);
+                const isAllIn = playerState?.isAllIn;
                 return (
                   <P5Button
                     key={pos}
                     className={`px-6 py-4 font-bold polygon-button border-2 min-w-[5rem] ${
                       isHero
                         ? 'bg-p5-red border-white text-white'
+                        : isAllIn
+                        ? 'bg-amber-900/30 border-amber-400 text-amber-300'
                         : 'bg-black border-white text-white hover:bg-gray-800'
                     }`}
                     style={{ transform: 'skewX(-7deg)' }}
@@ -865,6 +949,7 @@ export default function RecordPage() {
                   >
                     {pos}
                     {isHero && <span className="block text-xs font-black text-white/90 mt-0.5">(You)</span>}
+                    {isAllIn && !isHero && <span className="block text-[10px] font-bold text-amber-400">ALL-IN</span>}
                   </P5Button>
                 );
               })}
@@ -966,6 +1051,7 @@ export default function RecordPage() {
             </>
           )}
         </AnimatePresence>
+        {navOverlay}
       </main>
     );
   }
@@ -1084,6 +1170,46 @@ export default function RecordPage() {
         >
           履歴へ
         </motion.button>
+
+        {/* UI-28: Next Hand ボタン — 保存して次のハンドを即開始 */}
+        <motion.button
+          type="button"
+          className="w-full max-w-xs py-3 mt-2 border-2 border-white/40 text-white/80 font-p5-en font-bold text-sm polygon-button relative z-10 bg-black/50"
+          style={{ transform: 'skewX(-7deg)' }}
+          whileTap={{ scale: 0.92 }}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.75 }}
+          onClick={() => {
+            // 現在のハンドを保存
+            finishHand({ won: heroWon, amount: displayAmount });
+            if (memo) {
+              try {
+                const raw = localStorage.getItem('poker3_history');
+                if (raw) {
+                  const hands = JSON.parse(raw);
+                  if (hands.length > 0) {
+                    hands[hands.length - 1].memo = memo;
+                    localStorage.setItem('poker3_history', JSON.stringify(hands));
+                  }
+                }
+              } catch { /* memo save failure */ }
+            }
+            // タブ切替せず次のハンドへ
+            setStep('hero');
+            setSelectedPosition(null);
+            setPreflopOpener(null);
+            setPreflopNextToAct(null);
+            setWhoOpenSelectedPosition(null);
+            setSelectedWinner(null);
+            setPotWinnerMap(new Map());
+            setConfirmedPotWinners([]);
+            setMemo('');
+          }}
+        >
+          NEXT HAND
+        </motion.button>
+        {navOverlay}
       </main>
     );
   }
@@ -1184,9 +1310,9 @@ export default function RecordPage() {
             </div>
           )}
         </div>
-        {/* UI-19: 全プレイヤーステータス表示（現在→赤BG、次→赤枠、fold→灰取消線、all-in→琥珀） */}
+        {/* UI-34: プレイヤーステータス表示（現在=最大・最目立つ、次=中目立ち、残り=小、fold=グレーアウト） */}
         {gameState && (
-          <div className="flex flex-wrap items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1.5">
             {gameState.players.map((p) => {
               const isCurrent = p.position === nextToAct;
               const isNext = p.position === afterNextToAct;
@@ -1195,24 +1321,24 @@ export default function RecordPage() {
               const isHero = p.position === currentHand?.heroPosition;
 
               if (isFolded) {
-                return <span key={p.position} className="font-p5-en text-[11px] text-gray-600 line-through opacity-50 px-1">{p.position}</span>;
+                return <span key={p.position} className="font-p5-en text-[10px] text-gray-600 line-through opacity-40 px-0.5">{p.position}</span>;
               }
               if (isCurrent) {
                 return (
-                  <span key={p.position} className="font-p5-en font-black text-sm bg-p5-red text-white px-2 py-0.5 rounded glow-red" style={{ transform: 'skewX(-5deg)' }}>
+                  <span key={p.position} className="font-p5-en font-black text-base bg-p5-red text-white px-3 py-1 rounded glow-red" style={{ transform: 'skewX(-5deg)' }}>
                     → {p.position}{isHero ? ' ★' : ''}
                   </span>
                 );
               }
               if (isNext) {
                 return (
-                  <span key={p.position} className="font-p5-en font-bold text-[11px] text-p5-red border border-p5-red/50 px-1.5 py-0.5 rounded">
+                  <span key={p.position} className="font-p5-en font-bold text-sm text-p5-red border border-p5-red/50 px-2 py-0.5 rounded">
                     {p.position} ›
                   </span>
                 );
               }
               return (
-                <span key={p.position} className={`font-p5-en text-[11px] px-1 ${isAllIn ? 'text-amber-400 font-bold' : 'text-white/70'}`}>
+                <span key={p.position} className={`font-p5-en text-xs px-1 ${isAllIn ? 'text-amber-400 font-bold' : 'text-white/50'}`}>
                   {p.position}{isAllIn ? ' AI' : ''}
                 </span>
               );
@@ -1317,9 +1443,22 @@ export default function RecordPage() {
           )}
           {step === 'action' && selectedPosition && (
             <>
-              <h2 className="font-p5-en text-xl sm:text-2xl font-black mb-2 text-center glow-red-text" style={{ transform: 'skewX(-5deg)' }}>
-                {selectedPosition} — ACTION
-              </h2>
+              {/* UI-31: ポジション名を大きなバッジ + 色分けで明確表示 */}
+              <div className="text-center mb-2">
+                <span
+                  className={`font-p5-en text-3xl sm:text-4xl font-black inline-block px-5 py-1 rounded ${
+                    selectedPosition === heroPosition
+                      ? 'bg-p5-red text-white glow-red'
+                      : 'bg-white/10 text-white border-2 border-white/40'
+                  }`}
+                  style={{ transform: 'skewX(-7deg)' }}
+                >
+                  {selectedPosition}
+                </span>
+                <span className="font-p5-en text-base text-gray-400 block mt-0.5" style={{ transform: 'skewX(-5deg)' }}>
+                  ACTION
+                </span>
+              </div>
               {flowError && (
                 <p className="text-p5-red text-sm text-center mb-2 font-bold" style={{ transform: 'skewX(-3deg)' }}>
                   {flowError}
@@ -1339,6 +1478,7 @@ export default function RecordPage() {
           <span className="font-p5-en text-xs text-gray-500">{gameState?.actions.length ?? 0}</span>
         </div>
       </div>
+      {navOverlay}
     </main>
   );
 }

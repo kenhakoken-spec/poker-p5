@@ -231,6 +231,14 @@ export function getAvailableActions(
   // ルール1: オールイン済みプレイヤーはアクション不要
   if (player.isAllIn) return [];
 
+  // BUG-16: アクション履歴からベット状態を自力計算（lastBetパラメータに依存しない）
+  const bettingState = trackStreetBettingState(actions, street);
+  const effectiveBetLevel = bettingState.currentBet;
+  const playerContrib = bettingState.contributions.get(position) ?? 0;
+  const callAmount = Math.max(0, effectiveBetLevel - playerContrib);
+  // lastBetが渡されない場合はeffectiveBetLevelで代替（サイズ計算用）
+  const effectiveLastBet = lastBet ?? (effectiveBetLevel > 0 ? effectiveBetLevel : undefined);
+
   const available: { action: string; sizes?: BetSize[] }[] = [];
 
   // フォールドは常に可能
@@ -244,7 +252,10 @@ export function getAvailableActions(
   if (!hasBet) {
     available.push({ action: 'check' });
   } else {
-    if (lastBet && player.stack >= lastBet) {
+    // BUG-16: callAmountをアクション履歴から計算（lastBetに依存しない）
+    // stack > callAmount: 通常のcall（チップが残る）
+    // stack === callAmount: コールオールイン（all-in扱い、ここでは追加しない）
+    if (callAmount > 0 && player.stack > callAmount) {
       available.push({ action: 'call' });
     }
   }
@@ -259,15 +270,15 @@ export function getAvailableActions(
     let sizes: BetSize[] = [];
 
     if (street === 'preflop') {
-      sizes = getPreflopBetSizes(player.stack, lastBet);
+      sizes = getPreflopBetSizes(player.stack, effectiveLastBet);
     } else {
       if (!hasBet) {
         // Postflop first action: Pot-relative
         sizes = getPostflopFirstActionBetSizes(pot, player.stack);
       } else {
         // Postflop against bet/raise: Bet-relative
-        if (lastBet) {
-          sizes = getPostflopBetSizes(player.stack, lastBet);
+        if (effectiveLastBet) {
+          sizes = getPostflopBetSizes(player.stack, effectiveLastBet);
         }
       }
     }
@@ -283,8 +294,8 @@ export function getAvailableActions(
     // オールインは常に追加（スタックが0より大きい場合）
     available.push({ action: 'all-in' });
   } else if (isRestricted && player.stack > 0) {
-    // 制限中: コール不足時のみオールイン可（コールオールイン）
-    if (hasBet && lastBet && player.stack < lastBet) {
+    // BUG-16: callAmountを使用（制限中: コール不足またはコールで全スタック消費時のオールイン）
+    if (hasBet && callAmount > 0 && player.stack <= callAmount) {
       available.push({ action: 'all-in' });
     }
   }
