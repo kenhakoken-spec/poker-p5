@@ -629,7 +629,7 @@ export default function RecordPage() {
     const titleText = 'Record Hand';
     // UI-29: p-4を除去し、flex + justify-center + items-center + h-full で縦方向中央
     return (
-      <main className="h-[100dvh] overflow-hidden bg-black text-white flex flex-col">
+      <main className="h-full overflow-hidden bg-black text-white flex flex-col">
         <div className="flex-1 flex flex-col items-center justify-center">
           <div className="flex justify-center flex-wrap gap-0.5 mb-4">
             {titleText.split('').map((char, i) => (
@@ -658,7 +658,7 @@ export default function RecordPage() {
           </motion.button>
         </div>
         {/* UI-51: バージョン表示を最下部中央に配置（mt-auto効果でflex末尾） */}
-        <div className="text-center pb-4">
+        <div className="shrink-0 text-center pb-4">
           <span className="text-[10px] font-p5-en text-white/30">v{pkg.version}</span>
         </div>
       </main>
@@ -1025,7 +1025,7 @@ export default function RecordPage() {
             )}
           </div>
         </div>
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0 flex flex-col">
           <BoardSelector
             street={pendingBoardStreet}
             count={count}
