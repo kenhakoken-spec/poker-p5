@@ -542,7 +542,7 @@ export default function RecordPage() {
     const titleText = 'Record Hand';
     // UI-29: p-4を除去し、flex + justify-center + items-center + h-full で縦方向中央
     return (
-      <main className="min-h-screen overflow-hidden bg-black text-white flex flex-col items-center justify-center">
+      <main className="min-h-screen overflow-hidden bg-black text-white flex flex-col items-center justify-center relative">
         <div className="flex justify-center flex-wrap gap-0.5 mb-4">
           {titleText.split('').map((char, i) => (
             <motion.span
@@ -568,6 +568,8 @@ export default function RecordPage() {
         >
           Start
         </motion.button>
+        {/* UI-42: バージョン表示 */}
+        <span className="absolute bottom-2 right-2 text-[10px] font-p5-en text-white/30">v0.2.0</span>
       </main>
     );
   }
@@ -743,103 +745,127 @@ export default function RecordPage() {
       : new Set<string>();
     const selectable = afterOpener.filter((p) => !acted.has(p) && !allInPositions.has(p));
 
-    if (preflopNextToAct === null) {
-      return (
-        <main className="h-full overflow-hidden bg-black text-white flex flex-col">
-          <div className="shrink-0 px-3 pt-2 pb-1 border-b border-white/20">
-            <motion.h2
-              className="font-p5-en text-lg font-black whitespace-nowrap"
-              style={{ transform: 'skewX(-7deg)' }}
-              animate={{ opacity: [1, 0.96, 1] }}
-              transition={{ duration: 2.5, repeat: Infinity, repeatType: 'reverse' }}
-            >
-              Who acted next?
-            </motion.h2>
-            <p className="text-[10px] text-gray-400 mt-0.5">Select one (grey = already acted)</p>
-          </div>
-          <div className="flex-1 min-h-0 p-3 grid grid-cols-3 gap-2 content-start">
-            {order.map((pos) => {
-              const isAfterOpener = afterOpener.includes(pos);
-              const hasActed = acted.has(pos);
-              const isDisabled = !isAfterOpener || hasActed;
-              const isHero = pos === currentHand?.heroPosition;
-
-              return (
-                <P5Button
-                  key={pos}
-                  className={`h-14 px-2 border-2 font-black text-sm polygon-button w-full flex flex-col items-center justify-center ${
-                    isDisabled
-                      ? 'bg-black/40 text-white/30 opacity-40 cursor-not-allowed border-white/30'
-                      : isHero
-                      ? 'bg-p5-red/20 border-p5-red text-white ring-2 ring-p5-red ring-offset-2 ring-offset-black'
-                      : 'bg-black text-white border-white'
-                  }`}
-                  style={{ transform: 'skewX(-7deg)', clipPath: 'polygon(8% 0%, 100% 0%, 92% 100%, 0% 100%)' }}
-                  onClick={() => !isDisabled && setPreflopNextToAct(pos)}
-                  disabled={isDisabled}
-                >
-                  {pos}
-                  {isHero && !isDisabled && <span className="block text-[10px] text-p5-red font-bold">(You)</span>}
-                </P5Button>
-              );
-            })}
-          </div>
-          {navOverlay}
-        </main>
-      );
-    }
-
     if (!gameState) return null;
-    const stack = gameState.players.find((p) => p.position === preflopNextToAct)?.stack ?? 100;
+    const opponentForSheet = preflopNextToAct;
+    const stackForOpponent = opponentForSheet
+      ? (gameState.players.find((p) => p.position === opponentForSheet)?.stack ?? 100)
+      : 0;
     const lastBet = gameState.lastBet;
-    const raiseSizes = getPreflopBetSizes(stack, lastBet).filter((s) => s.amount && (s.amount ?? 0) > (lastBet ?? 0));
+    const raiseSizes = opponentForSheet
+      ? getPreflopBetSizes(stackForOpponent, lastBet).filter((s) => s.amount && (s.amount ?? 0) > (lastBet ?? 0))
+      : [];
 
+    // UI-43: ポジション選択グリッド + せり上がりボトムシート（preflopWhoOpenと統一）
     return (
-      <main className="h-full overflow-hidden bg-black text-white flex flex-col">
+      <main className="h-full overflow-hidden bg-black text-white flex flex-col relative">
         <div className="shrink-0 px-3 pt-2 pb-1 border-b border-white/20">
           <motion.h2
-            className="font-p5-en text-lg font-black"
+            className="font-p5-en text-lg font-black whitespace-nowrap"
             style={{ transform: 'skewX(-7deg)' }}
-            animate={{ opacity: [1, 0.97, 1] }}
-            transition={{ duration: 2.2, repeat: Infinity, repeatType: 'reverse' }}
+            animate={{ opacity: [1, 0.96, 1] }}
+            transition={{ duration: 2.5, repeat: Infinity, repeatType: 'reverse' }}
           >
-            {preflopNextToAct} {preflopNextToAct === currentHand?.heroPosition ? '(You) ' : ''}— action
+            Who acted next?
           </motion.h2>
-          <p className="text-[10px] text-gray-400 mt-0.5">Call, Raise 2x/3x, or All-in</p>
+          <p className="text-[10px] text-gray-400 mt-0.5">Select one (grey = already acted)</p>
         </div>
-        <div className="flex-1 min-h-0 p-3 flex flex-col justify-center gap-2 overflow-auto">
-          {/* UI-23: Call=青白、Raise=赤、All-in=赤強調グロー（UI-3色分け統一） */}
-          <motion.button
-            type="button"
-            className="w-full min-h-[44px] py-3 border-2 border-blue-400/40 font-black text-base polygon-button text-white"
-            style={{ transform: 'skewX(-7deg)', background: 'rgba(200,200,255,0.15)' }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => handlePreflopOpponentsConfirm(preflopNextToAct, 'call')}
-          >
-            Call
-          </motion.button>
-          {raiseSizes.map((s) => (
-            <motion.button
-              key={s.amount ?? 0}
-              type="button"
-              className="w-full min-h-[44px] py-3 border-2 border-red-400/60 font-black text-base polygon-button text-red-200"
-              style={{ transform: 'skewX(-7deg)', background: 'rgba(200,0,0,0.25)' }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => handlePreflopOpponentsConfirm(preflopNextToAct, 'raise', s)}
-            >
-              Raise {s.amount} BB
-            </motion.button>
-          ))}
-          <motion.button
-            type="button"
-            className="w-full min-h-[44px] py-3 border-2 border-red-500 font-black text-base polygon-button text-white glow-red glow-red-text"
-            style={{ transform: 'skewX(-7deg)', background: 'rgba(200,0,0,0.35)' }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => handlePreflopOpponentsConfirm(preflopNextToAct, 'all-in')}
-          >
-            All-in ({stack} BB)
-          </motion.button>
+        <div className="flex-1 min-h-0 p-3 grid grid-cols-3 gap-2 content-start">
+          {order.map((pos) => {
+            const isAfterOpener = afterOpener.includes(pos);
+            const hasActed = acted.has(pos);
+            const isDisabled = !isAfterOpener || hasActed;
+            const isHero = pos === currentHand?.heroPosition;
+
+            return (
+              <P5Button
+                key={pos}
+                className={`h-14 px-2 border-2 font-black text-sm polygon-button w-full flex flex-col items-center justify-center ${
+                  isDisabled
+                    ? 'bg-black/40 text-white/30 opacity-40 cursor-not-allowed border-white/30'
+                    : isHero
+                    ? 'bg-p5-red/20 border-p5-red text-white ring-2 ring-p5-red ring-offset-2 ring-offset-black'
+                    : 'bg-black text-white border-white'
+                }`}
+                style={{ transform: 'skewX(-7deg)', clipPath: 'polygon(8% 0%, 100% 0%, 92% 100%, 0% 100%)' }}
+                onClick={() => !isDisabled && setPreflopNextToAct(pos)}
+                disabled={isDisabled}
+              >
+                {pos}
+                {isHero && !isDisabled && <span className="block text-[10px] text-p5-red font-bold">(You)</span>}
+              </P5Button>
+            );
+          })}
         </div>
+        {/* UI-43: せり上がりボトムシート（preflopWhoOpenと同一パターン） */}
+        <AnimatePresence>
+          {opponentForSheet && (
+            <>
+              <motion.div
+                className="fixed inset-0 bg-black/50 z-40"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                onClick={() => setPreflopNextToAct(null)}
+              />
+              <motion.div
+                className="fixed left-0 right-0 bottom-0 z-50 bg-black border-t-2 border-white p-4 pb-safe"
+                initial={{ y: '100%' }}
+                animate={{ y: 0 }}
+                exit={{ y: '100%' }}
+                transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              >
+                <motion.h3
+                  className="font-p5-en text-base font-black mb-3"
+                  style={{ transform: 'skewX(-7deg)' }}
+                  animate={{ opacity: [1, 0.97, 1] }}
+                  transition={{ duration: 2.2, repeat: Infinity, repeatType: 'reverse' }}
+                >
+                  {opponentForSheet}{opponentForSheet === currentHand?.heroPosition ? ' (You)' : ''} — Action
+                </motion.h3>
+                <div className="flex flex-col gap-2">
+                  <motion.button
+                    type="button"
+                    className="w-full min-h-[44px] py-3 border-2 border-blue-400/40 font-black polygon-button text-white"
+                    style={{ transform: 'skewX(-7deg)', background: 'rgba(200,200,255,0.15)' }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => handlePreflopOpponentsConfirm(opponentForSheet, 'call')}
+                  >
+                    Call
+                  </motion.button>
+                  {raiseSizes.map((s) => (
+                    <motion.button
+                      key={s.amount ?? 0}
+                      type="button"
+                      className="w-full min-h-[44px] py-3 border-2 border-red-400/60 font-black polygon-button text-red-200"
+                      style={{ transform: 'skewX(-7deg)', background: 'rgba(200,0,0,0.25)' }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => handlePreflopOpponentsConfirm(opponentForSheet, 'raise', s)}
+                    >
+                      Raise {s.amount} BB
+                    </motion.button>
+                  ))}
+                  <motion.button
+                    type="button"
+                    className="w-full min-h-[44px] py-3 border-2 border-red-500 font-black polygon-button text-white glow-red glow-red-text"
+                    style={{ transform: 'skewX(-7deg)', background: 'rgba(200,0,0,0.35)' }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => handlePreflopOpponentsConfirm(opponentForSheet, 'all-in')}
+                  >
+                    All-in ({stackForOpponent} BB)
+                  </motion.button>
+                </div>
+                <button
+                  type="button"
+                  className="mt-3 text-sm text-gray-400"
+                  onClick={() => setPreflopNextToAct(null)}
+                >
+                  Cancel
+                </button>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
         {navOverlay}
       </main>
     );

@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { loadHistory, saveHistory } from '@/utils/storage';
-import { exportToGemini, generateHandExport } from '@/utils/gemini';
+import { generateHandExport } from '@/utils/gemini';
 import { calculateCurrentPot } from '@/utils/potUtils';
 import type { Hand, ActionRecord } from '@/types/poker';
 
@@ -135,15 +135,15 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
         {/* Controls */}
         <div className="flex items-center gap-2 mb-4">
           {history.length > 0 && (
-            <motion.button
-              className="px-4 py-1.5 bg-p5-red text-white font-bold text-xs border border-white/30"
+            <a
+              href="https://gemini.google.com/app"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center px-4 py-1.5 bg-p5-red text-white font-bold text-xs border border-white/30 font-p5-en"
               style={{ clipPath: 'polygon(4% 0%, 100% 0%, 96% 100%, 0% 100%)' }}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.92 }}
-              onClick={() => exportToGemini()}
             >
-              <span className="font-p5-en">Export All</span>
-            </motion.button>
+              Export All
+            </a>
           )}
           <motion.button
             className={`px-4 py-1.5 font-bold text-xs border ${

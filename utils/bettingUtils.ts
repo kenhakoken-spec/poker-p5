@@ -252,10 +252,10 @@ export function getAvailableActions(
   if (!hasBet) {
     available.push({ action: 'check' });
   } else {
-    // BUG-16: callAmountをアクション履歴から計算（lastBetに依存しない）
-    // stack > callAmount: 通常のcall（チップが残る）
-    // stack === callAmount: コールオールイン（all-in扱い、ここでは追加しない）
-    if (callAmount > 0 && player.stack > callAmount) {
+    // BUG-20: callAmountをアクション履歴から計算（lastBetに依存しない）
+    // stack >= callAmount: call可能（stack===callAmountはcall-all-in = callとして扱う）
+    // stack < callAmount: call不可（ショートオールインは別途処理）
+    if (callAmount > 0 && player.stack >= callAmount) {
       available.push({ action: 'call' });
     }
   }
@@ -294,8 +294,9 @@ export function getAvailableActions(
     // オールインは常に追加（スタックが0より大きい場合）
     available.push({ action: 'all-in' });
   } else if (isRestricted && player.stack > 0) {
-    // BUG-16: callAmountを使用（制限中: コール不足またはコールで全スタック消費時のオールイン）
-    if (hasBet && callAmount > 0 && player.stack <= callAmount) {
+    // BUG-20: 制限中のショートオールイン（stack < callAmount: ベット額に届かない場合のみ）
+    // stack === callAmount の場合はL258でcallとして処理済み
+    if (hasBet && callAmount > 0 && player.stack < callAmount) {
       available.push({ action: 'all-in' });
     }
   }
