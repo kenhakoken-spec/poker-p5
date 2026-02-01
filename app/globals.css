@@ -6,6 +6,18 @@
   --p5-red: #D50000;
   --p5-black: #000000;
   --p5-white: #FFFFFF;
+  /* UI-44: dynamic viewport height（スマホURL/ナビバー対応） */
+  --app-height: 100vh;
+}
+
+@supports (height: 100dvh) {
+  :root {
+    --app-height: 100dvh;
+  }
+}
+
+html {
+  height: var(--app-height);
 }
 
 body {
@@ -19,6 +31,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
   position: relative;
+  min-height: var(--app-height);
 }
 
 /* B3: 背景ストライプ強化 — 3層ストライプ（細2px + 太6px + 白アクセント） */
@@ -281,4 +294,13 @@ body::after {
 @keyframes suit-pulse {
   0%, 100% { opacity: 0.8; transform: skewX(-8deg) scale(1); }
   50% { opacity: 1; transform: skewX(-8deg) scale(1.08); }
+}
+
+/* UI-44: Tailwind screen utilities を dvh でオーバーライド */
+.min-h-screen {
+  min-height: var(--app-height, 100vh) !important;
+}
+
+.h-screen {
+  height: var(--app-height, 100vh) !important;
 }

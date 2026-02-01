@@ -76,6 +76,9 @@ export default function RecordPage() {
   // BUG-19: スタックベースのステップ履歴
   const [stepHistory, setStepHistory] = useState<Step[]>(['start']);
   const skipAutoRef = useRef(false);
+  /** BUG-25: ストリート境界追跡 */
+  const streetBoundaryIndexRef = useRef(1);
+  const lastBoundaryStreetRef = useRef<Street | null>(null);
   const [selectedPosition, setSelectedPosition] = useState<Position | null>(null);
   const [pendingBoardStreet, setPendingBoardStreet] = useState<BoardStreet | null>(null);
   const [selectedWinner, setSelectedWinner] = useState<Position | Position[] | null>(null);
@@ -89,6 +92,9 @@ export default function RecordPage() {
   /** Who is Open ボトムシート: スライダーでベットサイズを選ぶ（初期は非表示） */
   const [whoOpenShowSlider, setWhoOpenShowSlider] = useState(false);
   const [whoOpenSliderBB, setWhoOpenSliderBB] = useState(2);
+  /** BUG-24: プリフロ対向者ボトムシート: スライダー */
+  const [opponentShowSlider, setOpponentShowSlider] = useState(false);
+  const [opponentSliderBB, setOpponentSliderBB] = useState(6);
   /** ショーダウンせり上がりシート表示 & 敗者ハンド入力 */
   const [showShowdownSheet, setShowShowdownSheet] = useState(false);
   const [showdownInputs, setShowdownInputs] = useState<ShowdownHand[]>([]);
@@ -128,6 +134,12 @@ export default function RecordPage() {
   })();
   const board = gameState?.board ?? currentHand?.board ?? [];
   const boardLength = board.length;
+
+  // BUG-25: ストリート境界検出（コンポーネント本体で検出、useEffectより先に設定）
+  if (gameState && gameState.street !== 'preflop' && gameState.street !== lastBoundaryStreetRef.current) {
+    streetBoundaryIndexRef.current = stepHistory.length;
+    lastBoundaryStreetRef.current = gameState.street;
+  }
 
   // B6: ストリート遷移バナー検知
   useEffect(() => {
@@ -281,6 +293,7 @@ export default function RecordPage() {
     };
     addActions([...folds, mainAction]);
     setPreflopNextToAct(null);
+    setOpponentShowSlider(false);
     // プリフロップでは常に「次に動いたポジション」をユーザーに選ばせる（自動で進めない）
     pushStep('preflopOpponents');
   };
@@ -340,8 +353,9 @@ export default function RecordPage() {
     }
 
     // 全アクティブプレイヤーがall-in → ボード選択→勝者選択に直行（ランアウト）
+    // BUG-25: 同期でpushStepしストリート境界を正確に検出
     if (acting.length === 0) {
-      setTimeout(() => pushStep('position'), 150); // UI-21: 300→150
+      pushStep('position');
       return;
     }
 
@@ -473,9 +487,12 @@ export default function RecordPage() {
     setStep('start');
     setStepHistory(['start']);
     skipAutoRef.current = true;
+    streetBoundaryIndexRef.current = 1;
+    lastBoundaryStreetRef.current = null;
     setSelectedPosition(null);
     setPreflopOpener(null);
     setPreflopNextToAct(null);
+    setOpponentShowSlider(false);
     setWhoOpenSelectedPosition(null);
     setSelectedWinner(null);
     setFlowError(null);
@@ -488,13 +505,15 @@ export default function RecordPage() {
 
   /** BUG-19: Back — スタックベースの戻り */
   const handleBack = () => {
-    if (stepHistory.length <= 1) return;
-
     // preflopOpponents sub-state: アクション選択中なら選択をクリアするだけ
     if (step === 'preflopOpponents' && preflopNextToAct !== null) {
       setPreflopNextToAct(null);
+      setOpponentShowSlider(false);
       return;
     }
+
+    // BUG-25: ストリート境界チェック
+    if (stepHistory.length <= streetBoundaryIndexRef.current) return;
 
     // 現在ステップに応じたstate cleanup
     if (step === 'action') setSelectedPosition(null);
@@ -505,6 +524,10 @@ export default function RecordPage() {
     setStepHistory(newHistory);
     setStep(newHistory[newHistory.length - 1]);
   };
+
+  /** BUG-25: Back可能判定 — ストリート境界 + サブステート考慮 */
+  const canGoBack = stepHistory.length > streetBoundaryIndexRef.current ||
+    (step === 'preflopOpponents' && preflopNextToAct !== null);
 
   /** UI-35: Navigation overlay (fixed bottom-left) + UI-41: Back disabled state */
   const navOverlay = step !== 'start' ? (
@@ -520,9 +543,9 @@ export default function RecordPage() {
       <button
         type="button"
         onClick={handleBack}
-        disabled={stepHistory.length <= 1}
+        disabled={!canGoBack}
         className={`px-2.5 py-1.5 text-[10px] font-p5-en font-bold border rounded min-h-[32px] ${
-          stepHistory.length <= 1
+          !canGoBack
             ? 'text-white/20 border-white/10 bg-black/40 cursor-not-allowed'
             : 'text-white/50 border-white/20 bg-black/70'
         }`}
@@ -542,7 +565,7 @@ export default function RecordPage() {
     const titleText = 'Record Hand';
     // UI-29: p-4を除去し、flex + justify-center + items-center + h-full で縦方向中央
     return (
-      <main className="min-h-screen overflow-hidden bg-black text-white flex flex-col items-center justify-center relative">
+      <main className="min-h-[100dvh] overflow-hidden bg-black text-white flex flex-col items-center justify-center relative">
         <div className="flex justify-center flex-wrap gap-0.5 mb-4">
           {titleText.split('').map((char, i) => (
             <motion.span
@@ -569,7 +592,7 @@ export default function RecordPage() {
           Start
         </motion.button>
         {/* UI-42: バージョン表示 */}
-        <span className="absolute bottom-2 right-2 text-[10px] font-p5-en text-white/30">v0.2.0</span>
+        <span className="absolute bottom-4 right-4 text-[10px] font-p5-en text-white/30">v0.2.1</span>
       </main>
     );
   }
@@ -593,7 +616,7 @@ export default function RecordPage() {
     const openSizes = openerForSheet ? getPreflopBetSizes(stackForOpener, undefined) : [];
 
     return (
-      <main className="h-full overflow-hidden bg-black text-white flex flex-col relative">
+      <main className="min-h-[100dvh] overflow-hidden bg-black text-white flex flex-col relative">
         <div className="shrink-0 px-3 pt-2 pb-1 border-b border-white/20">
           <motion.h2
             className="font-p5-en text-lg font-black whitespace-nowrap"
@@ -751,13 +774,14 @@ export default function RecordPage() {
       ? (gameState.players.find((p) => p.position === opponentForSheet)?.stack ?? 100)
       : 0;
     const lastBet = gameState.lastBet;
+    const minRaise = Math.max((lastBet ?? 2) * 2, 4);
     const raiseSizes = opponentForSheet
       ? getPreflopBetSizes(stackForOpponent, lastBet).filter((s) => s.amount && (s.amount ?? 0) > (lastBet ?? 0))
       : [];
 
     // UI-43: ポジション選択グリッド + せり上がりボトムシート（preflopWhoOpenと統一）
     return (
-      <main className="h-full overflow-hidden bg-black text-white flex flex-col relative">
+      <main className="min-h-[100dvh] overflow-hidden bg-black text-white flex flex-col relative">
         <div className="shrink-0 px-3 pt-2 pb-1 border-b border-white/20">
           <motion.h2
             className="font-p5-en text-lg font-black whitespace-nowrap"
@@ -787,7 +811,7 @@ export default function RecordPage() {
                     : 'bg-black text-white border-white'
                 }`}
                 style={{ transform: 'skewX(-7deg)', clipPath: 'polygon(8% 0%, 100% 0%, 92% 100%, 0% 100%)' }}
-                onClick={() => !isDisabled && setPreflopNextToAct(pos)}
+                onClick={() => { if (!isDisabled) { setPreflopNextToAct(pos); setOpponentShowSlider(false); setOpponentSliderBB(minRaise); } }}
                 disabled={isDisabled}
               >
                 {pos}
@@ -854,6 +878,38 @@ export default function RecordPage() {
                   >
                     All-in ({stackForOpponent} BB)
                   </motion.button>
+                  {/* BUG-24: スライダーでレイズサイズを選択 */}
+                  <button
+                    type="button"
+                    className="w-full py-2 text-xs font-bold text-white/80 border border-white/40 rounded"
+                    onClick={() => setOpponentShowSlider((v) => !v)}
+                  >
+                    {opponentShowSlider ? 'Close slider' : 'Choose raise size with slider'}
+                  </button>
+                  {opponentShowSlider && (
+                    <div className="pt-2 pb-1 border-t border-white/20">
+                      <p className="text-[10px] text-gray-400 mb-1">Raise size (BB): {opponentSliderBB}</p>
+                      <input
+                        type="range"
+                        min={minRaise}
+                        max={stackForOpponent}
+                        value={opponentSliderBB}
+                        onChange={(e) => setOpponentSliderBB(Number(e.target.value))}
+                        className="w-full h-2 bg-white/20 rounded accent-p5-red"
+                      />
+                      <motion.button
+                        type="button"
+                        className="w-full py-3 mt-2 border-2 border-white font-black text-sm polygon-button bg-black text-white"
+                        style={{ transform: 'skewX(-7deg)' }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => {
+                          handlePreflopOpponentsConfirm(opponentForSheet, 'raise', { type: 'bet-relative', value: opponentSliderBB, amount: opponentSliderBB });
+                        }}
+                      >
+                        Raise {opponentSliderBB} BB
+                      </motion.button>
+                    </div>
+                  )}
                 </div>
                 <button
                   type="button"
@@ -881,7 +937,7 @@ export default function RecordPage() {
       : [];
     
     return (
-      <main className="h-full overflow-hidden bg-black text-white flex flex-col">
+      <main className="min-h-[100dvh] overflow-hidden bg-black text-white flex flex-col">
         <div className="p-1.5 border-b border-white/20 flex flex-wrap items-center justify-between gap-1 shrink-0 bg-black/80">
           <PotDisplay compact />
           <div className="flex items-center gap-2 flex-wrap">
@@ -906,12 +962,10 @@ export default function RecordPage() {
   }
 
   if (step === 'winner') {
-    // BUG-16: all-inプレイヤーも勝者候補に確実に含める（active && (通常 || isAllIn)）
-    const winnerCandidates = gameState
-      ? gameState.players.filter(p => p.active).map(p => p.position)
-      : [];
+    // BUG-22: トップレベルのactivePlayers（最新のReactステートから算出）を使用
+    const winnerCandidates = activePlayers;
     return (
-      <main className="h-full overflow-hidden bg-black text-white flex flex-col items-center justify-center p-4 relative">
+      <main className="min-h-[100dvh] overflow-hidden bg-black text-white flex flex-col items-center justify-center p-4 relative">
         {/* A5: サイドポット対応勝者選択 */}
         {gameState?.sidePots && gameState.sidePots.length > 1 ? (
           <>
@@ -1134,7 +1188,7 @@ export default function RecordPage() {
     const displayAmount = Math.round(heroProfit * 10) / 10;
 
     return (
-      <main className="h-full overflow-hidden bg-black text-white p-4 flex flex-col items-center justify-center relative">
+      <main className="min-h-[100dvh] overflow-hidden bg-black text-white p-4 flex flex-col items-center justify-center relative">
         {/* 背景演出 */}
         <motion.div
           className="absolute inset-0 pointer-events-none"
@@ -1244,9 +1298,12 @@ export default function RecordPage() {
             // タブ切替せず次のハンドへ
             setStep('hero');
             setStepHistory(['hero']);
+            streetBoundaryIndexRef.current = 1;
+            lastBoundaryStreetRef.current = null;
             setSelectedPosition(null);
             setPreflopOpener(null);
             setPreflopNextToAct(null);
+            setOpponentShowSlider(false);
             setWhoOpenSelectedPosition(null);
             setSelectedWinner(null);
             setPotWinnerMap(new Map());
@@ -1273,7 +1330,7 @@ export default function RecordPage() {
   };
 
   return (
-    <main className="h-full overflow-hidden bg-black text-white flex flex-col relative">
+    <main className="min-h-[100dvh] overflow-hidden bg-black text-white flex flex-col relative">
       {/* B6: ストリート遷移バナー */}
       <AnimatePresence>
         {streetBanner && (
