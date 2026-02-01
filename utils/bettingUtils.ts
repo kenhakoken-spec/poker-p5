@@ -120,7 +120,8 @@ export function getAvailableActions(
   
   // チェック/コールの判定
   const streetActions = actions.filter(a => a.street === street);
-  const hasBet = streetActions.some(a => a.action === 'bet' || a.action === 'raise');
+  // BUG-12: all-inもbet/raiseとして扱う（オールイン後にcheck/betが出るのを防止）
+  const hasBet = streetActions.some(a => a.action === 'bet' || a.action === 'raise' || a.action === 'all-in');
   
   if (!hasBet) {
     available.push({ action: 'check' });
@@ -188,11 +189,12 @@ export function getForcedAction(
     return available[0].action;
   }
   
-  // フォールドしか選べない場合（スタック不足など）
+  // BUG-12: スタック不足でcallもall-inもできない場合のみ自動fold
   const player = players.find(p => p.position === position);
   if (player && lastBet && player.stack < lastBet) {
     const canCall = available.some(a => a.action === 'call');
-    if (!canCall) {
+    const canAllIn = available.some(a => a.action === 'all-in');
+    if (!canCall && !canAllIn) {
       return 'fold';
     }
   }

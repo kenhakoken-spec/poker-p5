@@ -64,8 +64,9 @@ export default function ActionSizeSelector({ position, onSelect }: ActionSizeSel
     setShowAllInFlash(true);
     setTimeout(() => {
       setShowAllInFlash(false);
-      onSelect('all-in' as Action);
-    }, 250);
+      // BUG-12: all-inにスタック額をsize付与（HandContextでlastBet・stack更新に必要）
+      onSelect('all-in' as Action, { type: 'bet-relative', value: 0, amount: stack });
+    }, 120); // UI-21: 250→120
   };
 
   const handleActionWithFeedback = (action: Action, size?: BetSize) => {
@@ -77,7 +78,7 @@ export default function ActionSizeSelector({ position, onSelect }: ActionSizeSel
     setTimeout(() => {
       setActionFeedback(null);
       onSelect(action, size);
-    }, 300);
+    }, 150); // UI-21: 300→150
   };
 
   const isAllIn = (size: BetSize, stack: number) => {
@@ -170,7 +171,7 @@ export default function ActionSizeSelector({ position, onSelect }: ActionSizeSel
             initial={{ opacity: 0 }}
             animate={{ opacity: 1, x: [0, -3, 3, -2, 2, 0] }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.25 }}
+            transition={{ duration: 0.12 }}
           >
             <motion.div
               className="text-white font-p5-en font-black"
@@ -182,7 +183,7 @@ export default function ActionSizeSelector({ position, onSelect }: ActionSizeSel
               initial={{ scale: 0, y: 0 }}
               animate={{ scale: 1.5, y: -100 }}
               exit={{ scale: 0, y: -200 }}
-              transition={{ duration: 0.25 }}
+              transition={{ duration: 0.12 }}
             >
               ALL-IN
             </motion.div>
@@ -199,7 +200,7 @@ export default function ActionSizeSelector({ position, onSelect }: ActionSizeSel
             initial={{ opacity: 0 }}
             animate={{ opacity: actionFeedback === 'fold' ? 0.5 : 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
+            transition={{ duration: 0.15 }}
           >
             {actionFeedback === 'fold' && (
               <motion.span
@@ -228,7 +229,7 @@ export default function ActionSizeSelector({ position, onSelect }: ActionSizeSel
                 className="absolute inset-y-0 w-24 bg-gradient-to-r from-transparent via-white/40 to-transparent"
                 initial={{ x: '-6rem' }}
                 animate={{ x: '100vw' }}
-                transition={{ duration: 0.3, ease: 'easeOut' }}
+                transition={{ duration: 0.15, ease: 'easeOut' }}
               />
             )}
             {actionFeedback === 'raise' && (
@@ -241,7 +242,7 @@ export default function ActionSizeSelector({ position, onSelect }: ActionSizeSel
                 initial={{ y: 0, opacity: 0.5 }}
                 animate={{ y: [0, -5, 0], opacity: 1 }}
                 exit={{ y: -5, opacity: 0 }}
-                transition={{ duration: 0.3 }}
+                transition={{ duration: 0.15 }}
               >
                 RAISE
               </motion.span>

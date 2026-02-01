@@ -125,7 +125,7 @@ export default function RecordPage() {
     const currentStreet = gameState.street;
     if (prevStreet !== null && currentStreet !== prevStreet && currentStreet !== 'preflop') {
       setStreetBanner(currentStreet.toUpperCase());
-      setTimeout(() => setStreetBanner(null), 800);
+      setTimeout(() => setStreetBanner(null), 400); // UI-21: 800→400
     }
     setPrevStreet(currentStreet);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -314,13 +314,13 @@ export default function RecordPage() {
     const acting = getActingPlayers(updatedPlayers);
 
     if (active.length <= 1) {
-      setTimeout(() => setStep('winner'), 600);
+      setTimeout(() => setStep('winner'), 300); // UI-21: 600→300
       return;
     }
 
     // 全アクティブプレイヤーがall-in → ボード選択→勝者選択に直行（ランアウト）
     if (acting.length === 0) {
-      setTimeout(() => setStep('position'), 300); // position→selectBoard→winnerへ自動進行
+      setTimeout(() => setStep('position'), 150); // UI-21: 300→150
       return;
     }
 
@@ -341,7 +341,7 @@ export default function RecordPage() {
       setTimeout(() => {
         setSelectedPosition(auto);
         setStep('action');
-      }, 300);
+      }, 150); // UI-21: 300→150
     } else {
       setStep('position');
     }
@@ -488,8 +488,8 @@ export default function RecordPage() {
   }
 
   if (step === 'preflopWhoOpen') {
-    // UI-18: BBはプリフロップでオープンレイズ不可のため除外
-    const order: Position[] = ['UTG', 'MP', 'CO', 'BTN', 'SB'];
+    // UI-18 + UI-20: BBはプリフロップでオープンレイズ不可（グレーアウト表示）
+    const order: Position[] = ['UTG', 'MP', 'CO', 'BTN', 'SB', 'BB'];
     const openerForSheet = whoOpenSelectedPosition;
     const stackForOpener = openerForSheet
       ? (gameState?.players.find((p) => p.position === openerForSheet)?.stack ?? 100)
@@ -512,17 +512,22 @@ export default function RecordPage() {
         <div className="flex-1 min-h-0 p-3 grid grid-cols-3 gap-2 content-start">
           {order.map((pos) => {
             const isHero = pos === currentHand?.heroPosition;
+            // UI-20: BBはプリフロップでオープンレイズ不可のためグレーアウト
+            const isBBDisabled = pos === 'BB';
             return (
               <P5Button
                 key={pos}
                 className={`py-3 px-2 font-black text-sm polygon-button w-full border-2 ${
-                  isHero ? 'bg-p5-red/20 border-p5-red ring-2 ring-p5-red ring-offset-2 ring-offset-black' : 'bg-black border-white'
+                  isBBDisabled
+                    ? 'bg-black/40 text-white/30 opacity-40 cursor-not-allowed border-white/30'
+                    : isHero ? 'bg-p5-red/20 border-p5-red ring-2 ring-p5-red ring-offset-2 ring-offset-black' : 'bg-black border-white'
                 }`}
                 style={{ transform: 'skewX(-7deg)', clipPath: 'polygon(8% 0%, 100% 0%, 92% 100%, 0% 100%)' }}
-                onClick={() => setWhoOpenSelectedPosition(pos)}
+                onClick={() => !isBBDisabled && setWhoOpenSelectedPosition(pos)}
+                disabled={isBBDisabled}
               >
                 {pos}
-                {isHero && <span className="block text-[10px] text-p5-red font-bold mt-0.5">(You)</span>}
+                {isHero && !isBBDisabled && <span className="block text-[10px] text-p5-red font-bold mt-0.5">(You)</span>}
               </P5Button>
             );
           })}
@@ -1102,7 +1107,7 @@ export default function RecordPage() {
               initial={{ clipPath: 'polygon(100% 0%, 100% 0%, 100% 100%, 100% 100%)' }}
               animate={{ clipPath: 'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)' }}
               exit={{ clipPath: 'polygon(0% 0%, 0% 0%, 0% 100%, 0% 100%)' }}
-              transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+              transition={{ duration: 0.15, ease: [0.22, 1, 0.36, 1] }}
             />
             <motion.span
               className="font-p5-en text-6xl sm:text-9xl font-black text-white relative z-10"
@@ -1110,7 +1115,7 @@ export default function RecordPage() {
               initial={{ scale: 0.3, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 1.5, opacity: 0 }}
-              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+              transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
             >
               {streetBanner}
             </motion.span>
@@ -1170,24 +1175,39 @@ export default function RecordPage() {
             </div>
           )}
         </div>
-        {/* 参加者＋ネクストアクション */}
-        {activePlayers.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 text-xs font-bold">
-            <span className="text-gray-400">参加:</span>
-            <span className="text-white/90">
-              {activePlayers.map((pos) => (
-                <span key={pos}>
-                  {pos === nextToAct ? (
-                    <span className="text-p5-red font-p5-en font-black ring-1 ring-p5-red px-1 rounded glow-red">→ {pos}</span>
-                  ) : (
-                    <span className="font-p5-en mr-1">{pos}</span>
-                  )}
+        {/* UI-19: 全プレイヤーステータス表示（現在→赤BG、次→赤枠、fold→灰取消線、all-in→琥珀） */}
+        {gameState && (
+          <div className="flex flex-wrap items-center gap-1">
+            {gameState.players.map((p) => {
+              const isCurrent = p.position === nextToAct;
+              const isNext = p.position === afterNextToAct;
+              const isFolded = !p.active;
+              const isAllIn = p.isAllIn && p.active;
+              const isHero = p.position === currentHand?.heroPosition;
+
+              if (isFolded) {
+                return <span key={p.position} className="font-p5-en text-[11px] text-gray-600 line-through opacity-50 px-1">{p.position}</span>;
+              }
+              if (isCurrent) {
+                return (
+                  <span key={p.position} className="font-p5-en font-black text-sm bg-p5-red text-white px-2 py-0.5 rounded glow-red" style={{ transform: 'skewX(-5deg)' }}>
+                    → {p.position}{isHero ? ' ★' : ''}
+                  </span>
+                );
+              }
+              if (isNext) {
+                return (
+                  <span key={p.position} className="font-p5-en font-bold text-[11px] text-p5-red border border-p5-red/50 px-1.5 py-0.5 rounded">
+                    {p.position} ›
+                  </span>
+                );
+              }
+              return (
+                <span key={p.position} className={`font-p5-en text-[11px] px-1 ${isAllIn ? 'text-amber-400 font-bold' : 'text-white/70'}`}>
+                  {p.position}{isAllIn ? ' AI' : ''}
                 </span>
-              ))}
-            </span>
-            {afterNextToAct && (
-              <span className="font-p5-en text-p5-red font-black glow-red-text">(NEXT: {afterNextToAct})</span>
-            )}
+              );
+            })}
           </div>
         )}
         {/* B11: 斜めディバイダー */}
@@ -1237,7 +1257,7 @@ export default function RecordPage() {
           initial={{ clipPath: 'polygon(100% 100%, 100% 100%, 100% 100%, 100% 100%)', opacity: 0 }}
           animate={{ clipPath: 'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)', opacity: 1 }}
           exit={{ clipPath: 'polygon(0% 0%, 0% 0%, 0% 0%, 0% 0%)', opacity: 0 }}
-          transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
         >
           {step === 'position' && (
             <>
