@@ -58,10 +58,16 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
   const [editingMemoId, setEditingMemoId] = useState<string | null>(null);
   const [memoText, setMemoText] = useState('');
   const [toast, setToast] = useState<string | null>(null);
+  const [canShare, setCanShare] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     setHistory(loadHistory());
+  }, []);
+
+  // BUG-27: navigator.share availability check (client-side only)
+  useEffect(() => {
+    setCanShare(typeof navigator !== 'undefined' && !!navigator.share);
   }, []);
 
   // BUG-13: isActive prop変更時にlocalStorageから再読み込み
@@ -135,15 +141,36 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
         {/* Controls */}
         <div className="flex items-center gap-2 mb-4">
           {history.length > 0 && (
-            <a
-              href="https://gemini.google.com/app"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center px-4 py-1.5 bg-p5-red text-white font-bold text-xs border border-white/30 font-p5-en"
-              style={{ clipPath: 'polygon(4% 0%, 100% 0%, 96% 100%, 0% 100%)' }}
-            >
-              Export All
-            </a>
+            <div className="flex flex-row gap-1.5">
+              <a
+                href="https://gemini.google.com/app"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center px-2.5 py-1.5 bg-black text-white font-bold text-xs border border-white/30 font-p5-en"
+                style={{ clipPath: 'polygon(4% 0%, 100% 0%, 96% 100%, 0% 100%)' }}
+              >
+                Gemini Web
+              </a>
+              <a
+                href="https://gemini.google.com/app"
+                target="_top"
+                rel="noopener noreferrer"
+                className="inline-flex items-center px-2.5 py-1.5 bg-black text-white font-bold text-xs border border-white/30 font-p5-en"
+                style={{ clipPath: 'polygon(4% 0%, 100% 0%, 96% 100%, 0% 100%)' }}
+              >
+                Gemini App
+              </a>
+              {canShare && (
+                <button
+                  type="button"
+                  className="px-2.5 py-1.5 bg-p5-red text-white font-bold text-xs border border-white/30 font-p5-en"
+                  style={{ clipPath: 'polygon(4% 0%, 100% 0%, 96% 100%, 0% 100%)' }}
+                  onClick={() => navigator.share({ title: 'Poker Hands', url: 'https://gemini.google.com/app' }).catch(() => {})}
+                >
+                  Share
+                </button>
+              )}
+            </div>
           )}
           <motion.button
             className={`px-4 py-1.5 font-bold text-xs border ${
@@ -381,11 +408,30 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
                                 href="https://gemini.google.com/app"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center px-3 py-1.5 bg-black text-white font-bold text-xs border border-white/30 font-p5-en"
+                                className="inline-flex items-center px-2.5 py-1.5 bg-black text-white font-bold text-xs border border-white/30 font-p5-en"
                                 style={{ clipPath: 'polygon(4% 0%, 100% 0%, 96% 100%, 0% 100%)' }}
                               >
-                                Open Gemini
+                                Web
                               </a>
+                              <a
+                                href="https://gemini.google.com/app"
+                                target="_top"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center px-2.5 py-1.5 bg-black text-white font-bold text-xs border border-white/30 font-p5-en"
+                                style={{ clipPath: 'polygon(4% 0%, 100% 0%, 96% 100%, 0% 100%)' }}
+                              >
+                                App
+                              </a>
+                              {canShare && (
+                                <button
+                                  type="button"
+                                  className="px-2.5 py-1.5 bg-p5-red text-white font-bold text-xs border border-white/30 font-p5-en"
+                                  style={{ clipPath: 'polygon(4% 0%, 100% 0%, 96% 100%, 0% 100%)' }}
+                                  onClick={() => navigator.share({ title: 'Poker Hand', text: generateHandExport(hand) }).catch(() => {})}
+                                >
+                                  Share
+                                </button>
+                              )}
                             </div>
                           </div>
                         </div>

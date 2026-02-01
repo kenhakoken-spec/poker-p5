@@ -9,6 +9,7 @@ import { getTotalContributions } from '@/utils/potUtils';
 import { getPreflopBetSizes } from '@/utils/bettingUtils';
 import { evaluateHand } from '@/utils/handEvaluator';
 import { getSelectablePositions, validateAction } from '@/utils/recordFlowValidation';
+import pkg from '../../package.json';
 import HeroSelector from '@/components/poker/HeroSelector';
 import PositionSelector from '@/components/poker/PositionSelector';
 import ActionSizeSelector from '@/components/poker/ActionSizeSelector';
@@ -565,7 +566,7 @@ export default function RecordPage() {
     const titleText = 'Record Hand';
     // UI-29: p-4を除去し、flex + justify-center + items-center + h-full で縦方向中央
     return (
-      <main className="min-h-[100dvh] overflow-hidden bg-black text-white flex flex-col items-center justify-center relative">
+      <main className="min-h-[100dvh] overflow-hidden bg-black text-white flex flex-col items-center justify-center">
         <div className="flex justify-center flex-wrap gap-0.5 mb-4">
           {titleText.split('').map((char, i) => (
             <motion.span
@@ -591,8 +592,8 @@ export default function RecordPage() {
         >
           Start
         </motion.button>
-        {/* UI-42: バージョン表示 */}
-        <span className="absolute bottom-4 right-4 text-[10px] font-p5-en text-white/30">v0.2.1</span>
+        {/* UI-46: バージョン表示をコンテンツフロー内に配置（Chrome URLバーに隠れない） */}
+        <span className="mt-6 text-[10px] font-p5-en text-white/30">v{pkg.version}</span>
       </main>
     );
   }
@@ -962,8 +963,14 @@ export default function RecordPage() {
   }
 
   if (step === 'winner') {
-    // BUG-22: トップレベルのactivePlayers（最新のReactステートから算出）を使用
-    const winnerCandidates = activePlayers;
+    // BUG-26: activeフラグに依存せず、アクション履歴からfold済みでないプレイヤーを直接算出
+    // addActionsのバッチ処理でactiveフラグが不整合になるケースを回避
+    const foldedPositions = gameState
+      ? new Set(gameState.actions.filter(a => a.action === 'fold').map(a => a.position))
+      : new Set<string>();
+    const winnerCandidates = gameState
+      ? gameState.players.filter(p => !foldedPositions.has(p.position)).map(p => p.position)
+      : [];
     return (
       <main className="min-h-[100dvh] overflow-hidden bg-black text-white flex flex-col items-center justify-center p-4 relative">
         {/* A5: サイドポット対応勝者選択 */}

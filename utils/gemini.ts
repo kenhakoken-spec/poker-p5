@@ -3,7 +3,7 @@ import { loadHistory } from './storage';
 import { calculateCurrentPot, getPotAfterEachAction } from './potUtils';
 
 const GEMINI_PROMPT_SINGLE =
-  'Based on the following Texas Hold\'em actions, please provide straightforward coaching advice.';
+  '以下のポーカーハンド履歴を分析してください。プレイの良かった点と改善点を教えてください。';
 
 /** TH準拠の1アクション行（ストリート・ポジション・アクション・額・その時点のポット） */
 export interface THActionRow {
@@ -31,7 +31,7 @@ export function handToTHActions(hand: Hand): THActionRow[] {
 // GeminiにエクスポートするJSONを生成（全履歴）
 export function generateGeminiExport(): string {
   const history = loadHistory();
-  const prompt = `You are a Texas Hold'em pro. Review the following hand flows and provide flat coaching.
+  const prompt = `以下の全ハンド履歴を分析してください。各ハンドのプレイの良かった点と改善点を教えてください。
 
 ${JSON.stringify(history, null, 2)}`;
   return prompt;
