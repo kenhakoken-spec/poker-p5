@@ -139,8 +139,17 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
               href="https://gemini.google.com/app"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center px-2.5 py-1.5 bg-p5-red text-white font-bold text-xs border border-white/30 font-p5-en"
-              style={{ clipPath: 'polygon(4% 0%, 100% 0%, 96% 100%, 0% 100%)' }}
+              style={{
+                display: 'inline-block',
+                padding: '6px 10px',
+                background: '#D50000',
+                color: '#fff',
+                fontWeight: 'bold',
+                fontSize: '0.75rem',
+                textDecoration: 'none',
+                border: '1px solid rgba(255,255,255,0.3)',
+              }}
+              className="font-p5-en"
             >
               Open Gemini
             </a>
@@ -372,8 +381,17 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
                               href="https://gemini.google.com/app"
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center px-2.5 py-1.5 bg-p5-red text-white font-bold text-xs border border-white/30 font-p5-en"
-                              style={{ clipPath: 'polygon(4% 0%, 100% 0%, 96% 100%, 0% 100%)' }}
+                              style={{
+                                display: 'inline-block',
+                                padding: '6px 10px',
+                                background: '#D50000',
+                                color: '#fff',
+                                fontWeight: 'bold',
+                                fontSize: '0.75rem',
+                                textDecoration: 'none',
+                                border: '1px solid rgba(255,255,255,0.3)',
+                              }}
+                              className="font-p5-en"
                             >
                               Open Gemini
                             </a>

@@ -629,7 +629,7 @@ export default function RecordPage() {
     const titleText = 'Record Hand';
     // UI-29: p-4を除去し、flex + justify-center + items-center + h-full で縦方向中央
     return (
-      <main className="h-full overflow-hidden bg-black text-white flex flex-col">
+      <main className="h-[100dvh] overflow-hidden bg-black text-white flex flex-col">
         <div className="flex-1 flex flex-col items-center justify-center">
           <div className="flex justify-center flex-wrap gap-0.5 mb-4">
             {titleText.split('').map((char, i) => (

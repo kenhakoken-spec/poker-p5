@@ -39,7 +39,7 @@ export default function BoardSelector({ street, count, usedCards, previousBoard 
   const label = street === 'flop' ? 'Flop (3 cards)' : street === 'turn' ? 'Turn (1 card)' : 'River (1 card)';
 
   return (
-    <div className="flex flex-col h-full overflow-hidden flex-1 min-h-0">
+    <div className="flex flex-col overflow-hidden flex-1 min-h-0">
       <div className="shrink-0 px-3 pt-2 pb-1 border-b border-white/20">
         <motion.h2 className="text-base font-black" style={{ transform: 'skewX(-7deg)' }}>
           Select {label}
