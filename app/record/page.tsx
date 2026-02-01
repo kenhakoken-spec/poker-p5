@@ -217,6 +217,7 @@ export default function RecordPage() {
   }, [step, nextToAct, gameState, boardLength]);
 
   // プリフロップ対向者: まだアクションしていないポジションがなければ position へ
+  // BUG-38: 全員フォールドで1人残りの場合はauto-winner処理
   useEffect(() => {
     if (skipAutoRef.current) return;
     if (step !== 'preflopOpponents' || preflopOpener === null || !gameState) return;
@@ -227,7 +228,27 @@ export default function RecordPage() {
     // BUG-14: オールイン済みプレイヤーもremainingから除外
     const allInPos = new Set(gameState.players.filter((p) => p.isAllIn && p.active).map((p) => p.position));
     const remaining = afterOpener.filter((p) => !acted.has(p) && !allInPos.has(p));
-    if (remaining.length === 0) pushStep('position');
+    if (remaining.length === 0) {
+      // BUG-38: 全員フォールドで1人残り → auto-winner（winner画面スキップ）
+      const active = getActivePlayers(gameState.players);
+      if (active.length <= 1) {
+        const foldedPositions = new Set(
+          gameState.actions.filter(a => a.action === 'fold').map(a => a.position)
+        );
+        const nonFolded = gameState.players
+          .filter(p => !foldedPositions.has(p.position))
+          .map(p => p.position);
+        if (nonFolded.length === 1) {
+          setSelectedWinner(nonFolded[0]);
+          setWinnerAndShowdown(nonFolded);
+          setTimeout(() => pushStep('result'), 300);
+        } else {
+          pushStep('winner');
+        }
+      } else {
+        pushStep('position');
+      }
+    }
   }, [step, preflopOpener, preflopNextToAct, gameState]);
 
   // BUG-19: Clear Back navigation skip flag after auto-transition useEffects

@@ -135,14 +135,15 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
         {/* Controls */}
         <div className="flex items-center gap-2 mb-4">
           {history.length > 0 && (
-            <button
-              type="button"
+            <a
+              href="https://gemini.google.com/app"
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-flex items-center px-2.5 py-1.5 bg-p5-red text-white font-bold text-xs border border-white/30 font-p5-en"
               style={{ clipPath: 'polygon(4% 0%, 100% 0%, 96% 100%, 0% 100%)' }}
-              onClick={() => window.open('https://gemini.google.com/app', '_blank', 'noopener,noreferrer')}
             >
-              Open Gemini Web
-            </button>
+              Open Gemini
+            </a>
           )}
           <motion.button
             className={`px-4 py-1.5 font-bold text-xs border ${
@@ -367,14 +368,15 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
                             >
                               <span className="font-p5-en">Copy</span>
                             </motion.button>
-                            <button
-                              type="button"
+                            <a
+                              href="https://gemini.google.com/app"
+                              target="_blank"
+                              rel="noopener noreferrer"
                               className="inline-flex items-center px-2.5 py-1.5 bg-p5-red text-white font-bold text-xs border border-white/30 font-p5-en"
                               style={{ clipPath: 'polygon(4% 0%, 100% 0%, 96% 100%, 0% 100%)' }}
-                              onClick={(e) => { e.stopPropagation(); window.open('https://gemini.google.com/app', '_blank', 'noopener,noreferrer'); }}
                             >
-                              Open Gemini Web
-                            </button>
+                              Open Gemini
+                            </a>
                           </div>
                         </div>
                       </motion.div>
