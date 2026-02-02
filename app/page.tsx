@@ -32,7 +32,7 @@ export default function Home() {
   return (
     <div
       className="bg-black text-white flex flex-col"
-      style={{ minHeight: '100dvh', maxHeight: '100dvh' }}
+      style={{ minHeight: '100dvh' }}
     >
       {/* Tab Navigation */}
       <nav className="shrink-0 flex border-b border-white/20">

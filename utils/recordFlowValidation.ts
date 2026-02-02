@@ -3,14 +3,16 @@
  * ポーカー流れ的に無理な操作を防ぐ。
  */
 import type { Position, Action, BetSize, GameState, ActionRecord } from '@/types/poker';
-import { getNextToAct, getActivePlayers, canAct } from './pokerUtils';
+import { getNextToAct, getActivePlayers, getActingPlayers, canAct } from './pokerUtils';
 import { getAvailableActions, getMinBet, calculateMinRaise } from './bettingUtils';
 
 /** このストリートで選択可能なポジション（＝次にアクションするポジションのみ） */
+// BUG-45: getActivePlayers → getActingPlayers に変更。
+// all-inプレイヤーはアクション不要なので選択可能候補から除外する。
 export function getSelectablePositions(gameState: GameState): Position[] {
-  const activePlayers = getActivePlayers(gameState.players);
+  const actingPlayers = getActingPlayers(gameState.players);
   const streetActions = gameState.actions.filter((a) => a.street === gameState.street);
-  const next = getNextToAct(gameState.street, activePlayers, streetActions);
+  const next = getNextToAct(gameState.street, actingPlayers, streetActions);
   return next ? [next] : [];
 }
 

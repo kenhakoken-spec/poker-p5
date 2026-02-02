@@ -166,25 +166,6 @@ export function calculateCurrentPot(actions: ActionRecord[]): number {
   
   return calculatePotForStreet(actions, lastStreet);
 }
-
-// ストリートごとのポット推移を計算
-export function calculatePotProgression(actions: ActionRecord[]): Record<Street, number> {
-  const progression: Record<Street, number> = {
-    preflop: INITIAL_POT,
-    flop: INITIAL_POT,
-    turn: INITIAL_POT,
-    river: INITIAL_POT,
-  };
-
-  const streets: Street[] = ['preflop', 'flop', 'turn', 'river'];
-
-  for (const street of streets) {
-    progression[street] = calculatePotForStreet(actions, street);
-  }
-
-  return progression;
-}
-
 /** 指定ストリート開始前（前ストリート終了時点）のポット */
 export function getPotBeforeStreet(actions: ActionRecord[], street: Street): number {
   const streets: Street[] = ['preflop', 'flop', 'turn', 'river'];

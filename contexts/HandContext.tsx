@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useRef, ReactNode } from 'react';
 import type { Hand, ActionRecord, Position, Street, GameState, PlayerState, ShowdownHand } from '@/types/poker';
 import { addHand } from '@/utils/storage';
 import { getActionOrder, getActivePlayers, getActingPlayers } from '@/utils/pokerUtils';
@@ -24,6 +24,13 @@ const HandContext = createContext<HandContextType | undefined>(undefined);
 export function HandProvider({ children }: { children: ReactNode }) {
   const [currentHand, setCurrentHand] = useState<Hand | null>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
+
+  // BUG-45 P5/P6: refs で最新 state を追跡。addActions/addAction が React の
+  // 非同期 setState 完了前に連続呼出しされても、常に最新 state を参照できる。
+  const currentHandRef = useRef<Hand | null>(null);
+  const gameStateRef = useRef<GameState | null>(null);
+  currentHandRef.current = currentHand;
+  gameStateRef.current = gameState;
 
   const startNewHand = useCallback((positions: Position[], heroPosition: Position | null, heroHand?: [string, string]) => {
     const hand: Hand = {
@@ -55,26 +62,37 @@ export function HandProvider({ children }: { children: ReactNode }) {
       actions: [],
     };
 
+    currentHandRef.current = hand;
+    gameStateRef.current = state;
     setCurrentHand(hand);
     setGameState(state);
   }, []);
 
   const addAction = useCallback((action: ActionRecord) => {
-    if (!currentHand || !gameState) return;
+    // BUG-45 P5/P6: ref 経由で最新 state を取得（stale closure 防止）
+    const hand = currentHandRef.current;
+    const state = gameStateRef.current;
+    if (!hand || !state) return;
+
+    // BUG-45: all-in/inactive プレイヤーへの fold は無効（stale between ガード）
+    const targetPlayer = state.players.find(p => p.position === action.position);
+    if (action.action === 'fold' && targetPlayer && (!targetPlayer.active || targetPlayer.isAllIn)) {
+      return;
+    }
 
     // BUG-43: all-in で size 未設定の場合、アクションレコードにスタック全額を補完
     const fixedAction = (action.action === 'all-in' && action.size?.amount === undefined)
-      ? { ...action, size: { type: 'bet-relative' as const, value: 0, amount: gameState.players.find(p => p.position === action.position)?.stack ?? 0 } }
+      ? { ...action, size: { type: 'bet-relative' as const, value: 0, amount: state.players.find(p => p.position === action.position)?.stack ?? 0 } }
       : action;
 
-    const newActions = [...currentHand.actions, fixedAction];
-    const updatedHand = { ...currentHand, actions: newActions };
+    const newActions = [...hand.actions, fixedAction];
+    const updatedHand = { ...hand, actions: newActions };
 
     // ゲームステートを更新（コール額はこのストリートの最大投入額−自分の投入額で算出）
-    const contributionsBefore = getContributionsThisStreet(currentHand.actions, gameState.street);
-    const maxContribBefore = getMaxContributionThisStreet(currentHand.actions, gameState.street);
+    const contributionsBefore = getContributionsThisStreet(hand.actions, state.street);
+    const maxContribBefore = getMaxContributionThisStreet(hand.actions, state.street);
 
-    const updatedPlayers = gameState.players.map((player) => {
+    const updatedPlayers = state.players.map((player) => {
       if (player.position === fixedAction.position) {
         if (fixedAction.action === 'fold') {
           return { ...player, active: false };
@@ -99,29 +117,29 @@ export function HandProvider({ children }: { children: ReactNode }) {
     // BUG-14: Short all-in should not lower lastBet; use Math.max to prevent it
     const actionAmount = fixedAction.size?.amount;
     const newLastBet = actionAmount !== undefined
-      ? Math.max(actionAmount, gameState.lastBet ?? 0)
-      : gameState.lastBet;
+      ? Math.max(actionAmount, state.lastBet ?? 0)
+      : state.lastBet;
 
     // サイドポット計算（all-inが発生した場合）
     const hasAllIn = updatedPlayers.some(p => p.isAllIn && p.active);
     const sidePots = hasAllIn ? calculateSidePots(newActions, updatedPlayers) : undefined;
 
     // ストリート進行とハンド終了条件の判定
-    let newStreet = gameState.street;
+    let newStreet = state.street;
     const activePlayers = getActivePlayers(updatedPlayers);
     const actingPlayers = getActingPlayers(updatedPlayers);
 
     // 1人残り（全員フォールド）の場合はハンド終了（次のストリートに進まない）
     if (activePlayers.length <= 1) {
-      newStreet = gameState.street;
+      newStreet = state.street;
     } else {
       // TH準拠: ラウンドが閉じたときのみ次ストリート
       // actingPlayers（active && !isAllIn）のみをチェック対象とする
       const actingPositions = actingPlayers as string[];
       const playerStacks = new Map(updatedPlayers.map((p) => [p.position, p.stack]));
-      if (isStreetClosed(newActions, gameState.street, actingPositions, playerStacks)) {
+      if (isStreetClosed(newActions, state.street, actingPositions, playerStacks)) {
         const streets: Street[] = ['preflop', 'flop', 'turn', 'river'];
-        const currentIndex = streets.indexOf(gameState.street);
+        const currentIndex = streets.indexOf(state.street);
         if (currentIndex < streets.length - 1) {
           newStreet = streets[currentIndex + 1];
         }
@@ -133,10 +151,10 @@ export function HandProvider({ children }: { children: ReactNode }) {
     }
 
     // BUG-14: ストリート遷移時はlastBetをリセット（新ストリートでは誰もベットしていない）
-    const finalLastBet = newStreet !== gameState.street ? undefined : newLastBet;
+    const finalLastBet = newStreet !== state.street ? undefined : newLastBet;
 
     const updatedState: GameState = {
-      ...gameState,
+      ...state,
       street: newStreet,
       players: updatedPlayers,
       pot: newPot,
@@ -145,16 +163,26 @@ export function HandProvider({ children }: { children: ReactNode }) {
       sidePots,
     };
 
+    // BUG-45: ref を即座に更新（次の連続呼出しで最新 state を参照可能にする）
+    currentHandRef.current = updatedHand;
+    gameStateRef.current = updatedState;
     setCurrentHand(updatedHand);
     setGameState(updatedState);
-  }, [currentHand, gameState]);
+  }, []);
 
   const addActions = useCallback(
     (actions: ActionRecord[]) => {
-      if (!currentHand || !gameState || actions.length === 0) return;
-      let hand = currentHand;
-      let state = gameState;
+      // BUG-45 P5/P6: ref 経由で最新 state を取得（stale closure 防止）
+      if (!currentHandRef.current || !gameStateRef.current || actions.length === 0) return;
+      let hand: Hand = currentHandRef.current;
+      let state: GameState = gameStateRef.current;
       for (const action of actions) {
+        // BUG-45: all-in/inactive プレイヤーへの fold はスキップ（stale between ガード）
+        const targetPlayer = state.players.find(p => p.position === action.position);
+        if (action.action === 'fold' && targetPlayer && (!targetPlayer.active || targetPlayer.isAllIn)) {
+          continue;
+        }
+
         // BUG-43: all-in で size 未設定の場合、アクションレコードにスタック全額を補完
         const fa = (action.action === 'all-in' && action.size?.amount === undefined)
           ? { ...action, size: { type: 'bet-relative' as const, value: 0, amount: state.players.find(pl => pl.position === action.position)?.stack ?? 0 } }
@@ -224,10 +252,13 @@ export function HandProvider({ children }: { children: ReactNode }) {
           sidePots,
         };
       }
+      // BUG-45: ref を即座に更新（次の連続呼出しで最新 state を参照可能にする）
+      currentHandRef.current = hand;
+      gameStateRef.current = state;
       setCurrentHand(hand);
       setGameState(state);
     },
-    [currentHand, gameState]
+    []
   );
 
   const setBoardCards = useCallback((street: 'flop' | 'turn' | 'river', cards: string[]) => {
@@ -249,31 +280,39 @@ export function HandProvider({ children }: { children: ReactNode }) {
 
   const setWinnerAndShowdown = useCallback(
     (winnerPosition: Position | Position[], showdownHands?: ShowdownHand[]) => {
-      if (!currentHand) return;
-      setCurrentHand((h) =>
-        h ? { ...h, winnerPosition, showdownHands: showdownHands ?? h.showdownHands } : null
-      );
+      if (!currentHandRef.current) return;
+      setCurrentHand((h) => {
+        if (!h) return null;
+        const updated = { ...h, winnerPosition, showdownHands: showdownHands ?? h.showdownHands };
+        currentHandRef.current = updated;
+        return updated;
+      });
     },
-    [currentHand]
+    []
   );
 
   const finishHand = useCallback(
     (result?: { won: boolean; amount: number }) => {
-      if (!currentHand) return;
+      const hand = currentHandRef.current;
+      if (!hand) return;
 
       const finishedHand: Hand = {
-        ...currentHand,
+        ...hand,
         result,
       };
 
       addHand(finishedHand);
+      currentHandRef.current = null;
+      gameStateRef.current = null;
       setCurrentHand(null);
       setGameState(null);
     },
-    [currentHand]
+    []
   );
 
   const reset = useCallback(() => {
+    currentHandRef.current = null;
+    gameStateRef.current = null;
     setCurrentHand(null);
     setGameState(null);
   }, []);

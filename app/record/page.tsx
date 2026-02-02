@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useHand } from '@/contexts/HandContext';
 import type { Position, Action, BetSize, ActionRecord, Street, ShowdownHand, PotWinner } from '@/types/poker';
 import { getActivePlayers, getActingPlayers, getNextToAct, getActionOrder } from '@/utils/pokerUtils';
-import { getTotalContributions, getContributionsThisStreet, getMaxContributionThisStreet } from '@/utils/potUtils';
+import { getTotalContributions, getContributionsThisStreet, getMaxContributionThisStreet, isStreetClosed } from '@/utils/potUtils';
 import { getPreflopBetSizes } from '@/utils/bettingUtils';
 import { evaluateHand } from '@/utils/handEvaluator';
 import { getSelectablePositions, validateAction } from '@/utils/recordFlowValidation';
@@ -222,6 +222,12 @@ export default function RecordPage() {
     if (skipAutoRef.current) return;
     if (step !== 'preflopOpponents' || preflopOpener === null || !gameState) return;
     if (preflopNextToAct !== null) return;
+    // BUG-45 P6: 全員all-inでstreetがpreflop以降に進んだ場合、即座にposition へ遷移
+    // （preflopOpponentsに留まると無限ループになる）
+    if (gameState.street !== 'preflop') {
+      pushStep('position');
+      return;
+    }
     const order = getActionOrder('preflop');
     const afterOpener = order.slice(order.indexOf(preflopOpener) + 1);
     const acted = new Set(gameState.actions.filter((a) => a.street === 'preflop').map((a) => a.position));
@@ -312,7 +318,9 @@ export default function RecordPage() {
     const openerIndex = order.indexOf(preflopOpener);
     const nextIndex = order.indexOf(nextPosition);
     const alreadyActed = new Set(gameState.actions.filter((a) => a.street === 'preflop').map((a) => a.position));
-    const between = order.slice(openerIndex + 1, nextIndex).filter((pos) => !alreadyActed.has(pos));
+    // BUG-45 P5: all-inプレイヤーも between から除外（stale state で acted に含まれない場合のガード）
+    const allInPositions = new Set(gameState.players.filter(p => p.isAllIn && p.active).map(p => p.position));
+    const between = order.slice(openerIndex + 1, nextIndex).filter((pos) => !alreadyActed.has(pos) && !allInPositions.has(pos));
     const folds: ActionRecord[] = between.map((pos) => ({
       position: pos,
       action: 'fold' as Action,
@@ -426,6 +434,17 @@ export default function RecordPage() {
     const isOpenerJustActed = preflopOpener !== null && gameState.street === 'preflop' && preflopBets.length === 1;
     if (isOpenerJustActed) {
       pushStep('preflopOpponents');
+      return;
+    }
+
+    // BUG-45: ストリート遷移判定 — addActionが内部でストリートを進める場合、
+    // positionステップ経由でボード選択を先に行う必要がある。
+    // 直接actionステップに飛ぶと、ボード未選択のまま次プレイヤーに遷移してフリーズする。
+    const localPlayerStacks = new Map(updatedPlayers.map(p => [p.position as string, p.stack]));
+    const streetWillClose = isStreetClosed(newActions, gameState.street, acting as string[], localPlayerStacks);
+
+    if (streetWillClose) {
+      pushStep('position');
       return;
     }
 

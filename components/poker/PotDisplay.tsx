@@ -65,16 +65,31 @@ export default function PotDisplay({ compact }: PotDisplayProps) {
       <AnimatePresence mode="popLayout">
         <motion.p
           key={popKey}
-          className={`font-p5-en font-black text-white glow-red-text ${compact ? 'text-2xl sm:text-3xl' : 'text-4xl sm:text-6xl'}`}
+          className={`font-p5-en glow-red-text ${compact ? 'text-base sm:text-lg' : 'text-2xl sm:text-4xl'}`}
           style={{ transform: 'skewX(-5deg)' }}
           initial={{ scale: 1.15 }}
           animate={{ scale: 1 }}
           transition={{ type: 'spring', stiffness: 400, damping: 15 }}
         >
           {before > 0 ? (
-            <>POT: {total.toFixed(1)} = {before.toFixed(1)} + {thisStreet.toFixed(1)} BB</>
+            <>
+              <span className={`font-bold text-white ${compact ? 'text-lg sm:text-xl' : 'text-3xl sm:text-5xl'}`}>
+                POT: {total.toFixed(1)}
+              </span>
+              <span className={`text-white/50 ${compact ? 'text-xs sm:text-sm' : 'text-base sm:text-lg'}`}>
+                {' '}= {before.toFixed(1)} +{' '}
+              </span>
+              <span className={`text-yellow-400 font-semibold ${compact ? 'text-xs sm:text-sm' : 'text-base sm:text-lg'}`}>
+                {thisStreet.toFixed(1)}
+              </span>
+              <span className={`text-white/50 ${compact ? 'text-xs sm:text-sm' : 'text-base sm:text-lg'}`}>
+                {' '}BB
+              </span>
+            </>
           ) : (
-            <>POT: {total.toFixed(1)} BB</>
+            <span className={`font-bold text-white ${compact ? 'text-lg sm:text-xl' : 'text-3xl sm:text-5xl'}`}>
+              POT: {total.toFixed(1)} BB
+            </span>
           )}
         </motion.p>
       </AnimatePresence>

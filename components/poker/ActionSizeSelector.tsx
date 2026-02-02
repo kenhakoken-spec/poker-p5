@@ -5,7 +5,7 @@ import type { Action, BetSize, Position } from '@/types/poker';
 import { getAvailableActions, getForcedAction, getMinBet, calculateMinRaise } from '@/utils/bettingUtils';
 import { useHand } from '@/contexts/HandContext';
 import { POKER_CONFIG } from '@/utils/pokerConfig';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 
 interface ActionSizeSelectorProps {
   position: string;
@@ -20,6 +20,11 @@ export default function ActionSizeSelector({ position, onSelect }: ActionSizeSel
   const [showBetSlider, setShowBetSlider] = useState(false);
   const [sliderAmount, setSliderAmount] = useState(2);
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
+
+  // BUG-45: onSelect は非メモ化のため毎 render で変わる。依存配列から除外し、
+  // ref 経由で最新値を参照することで不要な useEffect 再実行と stale closure を防止。
+  const onSelectRef = useRef(onSelect);
+  onSelectRef.current = onSelect;
 
   useEffect(() => {
     if (!gameState) return;
@@ -47,11 +52,12 @@ export default function ActionSizeSelector({ position, onSelect }: ActionSizeSel
 
     if (forced) {
       setForcedAction(forced);
-      setTimeout(() => {
-        onSelect(forced as Action);
+      const timer = setTimeout(() => {
+        onSelectRef.current(forced as Action);
       }, 500);
+      return () => clearTimeout(timer);
     }
-  }, [gameState, position, onSelect]);
+  }, [gameState, position]);
 
   if (forcedAction) {
     return (
@@ -61,13 +67,13 @@ export default function ActionSizeSelector({ position, onSelect }: ActionSizeSel
     );
   }
 
+  // BUG-45: setTimeout(120ms)を削除。setShowAllInFlash(true)による再レンダリングで
+  // onSelect がstale closureになり、ALL-INがFOLDとして記録されるバグを修正。
+  // フラッシュ演出はコンポーネントのアンマウントで自然に消える。
   const handleAllInClick = () => {
     setShowAllInFlash(true);
-    setTimeout(() => {
-      setShowAllInFlash(false);
-      // BUG-12: all-inにスタック額をsize付与（HandContextでlastBet・stack更新に必要）
-      onSelect('all-in' as Action, { type: 'bet-relative', value: 0, amount: stack });
-    }, 120); // UI-21: 250→120
+    // BUG-12: all-inにスタック額をsize付与（HandContextでlastBet・stack更新に必要）
+    onSelect('all-in' as Action, { type: 'bet-relative', value: 0, amount: stack });
   };
 
   const handleActionWithFeedback = (action: Action, size?: BetSize) => {
