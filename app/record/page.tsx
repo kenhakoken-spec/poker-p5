@@ -736,6 +736,7 @@ export default function RecordPage() {
             const isHero = pos === currentHand?.heroPosition;
             // UI-20: BBはプリフロップでオープンレイズ不可のためグレーアウト
             const isBBDisabled = pos === 'BB';
+            const playerStack = gameState?.players.find(p => p.position === pos)?.stack ?? POKER_CONFIG.defaultStack;
             return (
               <P5Button
                 key={pos}
@@ -748,7 +749,7 @@ export default function RecordPage() {
                 onClick={() => !isBBDisabled && setWhoOpenSelectedPosition(pos)}
                 disabled={isBBDisabled}
               >
-                {pos}
+                <span>{pos} <span className="text-[10px] text-gray-400 font-normal">({playerStack}bb)</span></span>
                 {isHero && !isBBDisabled && <span className="block text-[10px] text-p5-red font-bold">(You)</span>}
               </P5Button>
             );
@@ -779,7 +780,7 @@ export default function RecordPage() {
                   animate={{ opacity: [1, 0.97, 1] }}
                   transition={{ duration: 2.2, repeat: Infinity, repeatType: 'reverse' }}
                 >
-                  {openerForSheet} — Open size
+                  {openerForSheet} ({stackForOpener}bb) — Open size
                 </motion.h3>
                 {/* UI-23: Call=青白、Bet=赤、All-in=赤強調グロー（UI-3色分け統一） */}
                 <div className="flex flex-col gap-2">
@@ -904,6 +905,7 @@ export default function RecordPage() {
             const hasActed = acted.has(pos);
             const isDisabled = !isAfterOpener || hasActed;
             const isHero = pos === currentHand?.heroPosition;
+            const playerStack = gameState?.players.find(p => p.position === pos)?.stack ?? POKER_CONFIG.defaultStack;
 
             return (
               <P5Button
@@ -919,7 +921,7 @@ export default function RecordPage() {
                 onClick={() => { if (!isDisabled) { setPreflopNextToAct(pos); setOpponentShowSlider(false); setOpponentSliderBB(minRaise); } }}
                 disabled={isDisabled}
               >
-                {pos}
+                <span>{pos} <span className="text-[10px] text-gray-400 font-normal">({playerStack}bb)</span></span>
                 {isHero && !isDisabled && <span className="block text-[10px] text-p5-red font-bold">(You)</span>}
               </P5Button>
             );
@@ -950,7 +952,7 @@ export default function RecordPage() {
                   animate={{ opacity: [1, 0.97, 1] }}
                   transition={{ duration: 2.2, repeat: Infinity, repeatType: 'reverse' }}
                 >
-                  {opponentForSheet}{opponentForSheet === currentHand?.heroPosition ? ' (You)' : ''} — Action
+                  {opponentForSheet} ({stackForOpponent}bb){opponentForSheet === currentHand?.heroPosition ? ' (You)' : ''} — Action
                 </motion.h3>
                 <div className="flex flex-col gap-2">
                   {/* BUG-35: Foldボタン追加 */}
@@ -1586,20 +1588,20 @@ export default function RecordPage() {
               if (isCurrent) {
                 return (
                   <span key={p.position} className="font-p5-en font-black text-base bg-p5-red text-white px-3 py-1 rounded glow-red" style={{ transform: 'skewX(-5deg)' }}>
-                    → {p.position}{isHero ? ' ★' : ''}
+                    → {p.position}{isHero ? ' ★' : ''} <span className="text-[10px] font-normal text-white/60">({p.stack}bb)</span>
                   </span>
                 );
               }
               if (isNext) {
                 return (
                   <span key={p.position} className="font-p5-en font-bold text-sm text-p5-red border border-p5-red/50 px-2 py-0.5 rounded">
-                    {p.position} ›
+                    {p.position} <span className="text-[10px] font-normal text-gray-400">({p.stack}bb)</span> ›
                   </span>
                 );
               }
               return (
                 <span key={p.position} className={`font-p5-en text-xs px-1 ${isAllIn ? 'text-amber-400 font-bold' : 'text-white/50'}`}>
-                  {p.position}{isAllIn ? ' AI' : ''}
+                  {p.position}<span className="text-[10px] font-normal text-gray-400">({p.stack}bb)</span>{isAllIn ? ' AI' : ''}
                 </span>
               );
             })}
@@ -1713,7 +1715,7 @@ export default function RecordPage() {
                   }`}
                   style={{ transform: 'skewX(-7deg)' }}
                 >
-                  {selectedPosition}
+                  {selectedPosition} <span className="text-base font-normal text-white/50">({gameState?.players.find(p => p.position === selectedPosition)?.stack ?? POKER_CONFIG.defaultStack}bb)</span>
                   {/* UI-40: フロップ以降ヒーローアクション時にHERO表示 */}
                   {selectedPosition === heroPosition && gameState?.street !== 'preflop' && (
                     <span className="text-lg font-bold ml-2 opacity-80">HERO</span>
