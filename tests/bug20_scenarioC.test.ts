@@ -157,12 +157,10 @@ describe('BUG-20 Phase1: シナリオ群C（3way基本4件）', () => {
       const names = actionNames(result);
 
       expect(names).toContain('fold');
-      // BB callAmount = 100-1 = 99, BB stack = 99
-      // Code: call requires stack > callAmount (strict >)
-      // 99 > 99 = false → call NOT available
-      // Task expects call: this may reveal a bug
-      expect(names).toContain('call');
+      // BUG-46: BB callAmount = 100-1 = 99, BB stack = 99
+      // stack === callAmount → All-in（TH準拠: 残スタック全額投入=オールイン）
       expect(names).toContain('all-in');
+      expect(names).not.toContain('call');
     });
 
     it('BB calls (all-in) → UTGの選択肢にcall/foldがある（isRestricted判定）', () => {
@@ -182,11 +180,10 @@ describe('BUG-20 Phase1: シナリオ群C（3way基本4件）', () => {
 
       // UTG is the only acting player → isRestricted = true
       expect(names).toContain('fold');
-      // UTG callAmount = 100-3 = 97, UTG stack = 97
-      // Code: stack > callAmount → 97 > 97 = false → no call
-      // isRestricted + stack <= callAmount → all-in available
-      // Task expects call; may get all-in instead
-      expect(names).toContain('call');
+      // BUG-46: UTG callAmount = 100-3 = 97, UTG stack = 97
+      // stack === callAmount → All-in（TH準拠: 残スタック全額投入=オールイン）
+      expect(names).toContain('all-in');
+      expect(names).not.toContain('call');
       expect(names).not.toContain('raise'); // isRestricted
     });
   });
@@ -211,7 +208,9 @@ describe('BUG-20 Phase1: シナリオ群C（3way基本4件）', () => {
 
       // Same as scenario 13 step 2: UTG only acting → isRestricted
       expect(names).toContain('fold');
-      expect(names).toContain('call'); // May fail: stack == callAmount → all-in only
+      // BUG-46: stack === callAmount → All-in（TH準拠）
+      expect(names).toContain('all-in');
+      expect(names).not.toContain('call');
       expect(names).not.toContain('raise');
     });
 
