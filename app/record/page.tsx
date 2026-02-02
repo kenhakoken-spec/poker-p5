@@ -89,6 +89,10 @@ export default function RecordPage() {
   ]);
 
   const skipAutoRef = useRef(false);
+  /** Browser back support: refs for popstate handler (BUG-45 stale closure prevention) */
+  const handleBackRef = useRef<() => void>(() => {});
+  const stepRef = useRef<Step>(step);
+  stepRef.current = step;
 
   // BUG-47: selectedPosition / pendingBoardStreet のref同期ラッパー
   // React batching でsetState後もref経由で最新値をpushStepに渡す
@@ -142,6 +146,17 @@ export default function RecordPage() {
     };
   }, [step]);
 
+  // Browser back: intercept popstate to use internal back logic instead of page navigation
+  useEffect(() => {
+    const onPopState = () => {
+      if (stepRef.current !== 'start') {
+        handleBackRef.current();
+      }
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
   /** BUG-19 + BUG-47: Push step to history stack with state snapshot */
   const pushStep = (newStep: Step) => {
     const { hand, gameState: gs } = getLatestState();
@@ -153,6 +168,7 @@ export default function RecordPage() {
       gameStateSnapshot: gs ? structuredClone(gs) : null,
     }]);
     setStep(newStep);
+    window.history.pushState({ step: newStep }, '');
   };
 
   const activePlayers = gameState ? getActivePlayers(gameState.players) : [];
@@ -646,6 +662,7 @@ export default function RecordPage() {
       prevEntry.gameStateSnapshot ? structuredClone(prevEntry.gameStateSnapshot) : null,
     );
   };
+  handleBackRef.current = handleBack;
 
   /** BUG-47: Back可能判定 — サブステート考慮 */
   const canGoBack = stepHistory.length > 1 ||
