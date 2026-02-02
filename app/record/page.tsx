@@ -7,7 +7,7 @@ import type { Position, Action, BetSize, ActionRecord, Street, ShowdownHand, Pot
 import { getActivePlayers, getActingPlayers, getNextToAct, getActionOrder } from '@/utils/pokerUtils';
 import { getTotalContributions, getContributionsThisStreet, getMaxContributionThisStreet, isStreetClosed } from '@/utils/potUtils';
 import { getPreflopBetSizes } from '@/utils/bettingUtils';
-import { evaluateHand } from '@/utils/handEvaluator';
+import { evaluateHandRank } from '@/utils/handRank';
 import { getSelectablePositions, validateAction } from '@/utils/recordFlowValidation';
 import pkg from '../../package.json';
 import { POKER_CONFIG } from '@/utils/pokerConfig';
@@ -1567,6 +1567,28 @@ export default function RecordPage() {
                   {c}
                 </motion.span>
               ))}
+              {/* FEAT: HEROハンドランクバッジ（フロップ以降） */}
+              {board.length >= 3 && (() => {
+                const rankName = evaluateHandRank(heroHand, board);
+                if (!rankName) return null;
+                return (
+                  <motion.span
+                    className="ml-1.5 font-p5-en text-[11px] font-black px-2 py-0.5 text-white border border-white/30"
+                    style={{
+                      transform: 'skewX(-7deg)',
+                      background: 'linear-gradient(135deg, #D50000 0%, #FF1744 100%)',
+                      textShadow: '0 0 6px rgba(213,0,0,0.6)',
+                      boxShadow: '0 0 8px rgba(213,0,0,0.3)',
+                    }}
+                    initial={{ scale: 0, opacity: 0, x: -10 }}
+                    animate={{ scale: 1, opacity: 1, x: 0 }}
+                    transition={{ type: 'spring', stiffness: 500, damping: 20 }}
+                    key={rankName}
+                  >
+                    {rankName}
+                  </motion.span>
+                );
+              })()}
             </div>
           )}
         </div>
@@ -1619,14 +1641,6 @@ export default function RecordPage() {
         >
           <div className="flex items-center justify-center gap-2 mb-1">
             <p className="font-p5-en text-[10px] text-gray-400">BOARD</p>
-            {heroHand && heroHand.length === 2 && board.length >= 3 && (() => {
-              const handName = evaluateHand(heroHand, board);
-              return handName ? (
-                <span className="font-p5-en text-[11px] font-bold text-p5-red" style={{ transform: 'skewX(-5deg)' }}>
-                  {handName}
-                </span>
-              ) : null;
-            })()}
           </div>
           <div className="flex justify-center gap-2 items-end" style={{ perspective: '800px' }}>
             {board.map((c, i) => (
