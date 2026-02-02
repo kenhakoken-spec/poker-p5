@@ -109,7 +109,7 @@ export default function TestGeminiPage() {
               fontSize: '1rem',
             }}
           >
-            <strong style={{ color: '#0ff' }}>A.</strong> _blank + rel="noopener noreferrer"
+            <strong style={{ color: '#0ff' }}>A.</strong> _blank + rel=&quot;noopener noreferrer&quot;
           </a>
 
           <a
