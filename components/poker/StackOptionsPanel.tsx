@@ -89,8 +89,8 @@ export default function StackOptionsPanel({
                 </div>
                 <input
                   type="range"
-                  min="1"
-                  max="300"
+                  min={POKER_CONFIG.minStack}
+                  max={POKER_CONFIG.maxStack}
                   value={bulkStack}
                   onChange={(e) => setBulkStack(Number(e.target.value))}
                   className="w-full accent-p5-red"
@@ -115,18 +115,18 @@ export default function StackOptionsPanel({
                       key={pos}
                       className="bg-gray-800 border border-white/20 rounded p-3 space-y-2"
                     >
-                      {/* Position Label + Stack */}
+                      {/* Position Label + Stack Slider */}
                       <div className="flex items-center gap-2">
-                        <span className="font-black text-white w-12">{pos}</span>
+                        <span className="font-p5-en font-black text-white w-10 text-sm">{pos}</span>
                         <input
-                          type="number"
-                          min="1"
-                          max="300"
+                          type="range"
+                          min={POKER_CONFIG.minStack}
+                          max={POKER_CONFIG.maxStack}
                           value={stack}
                           onChange={(e) => onStackChange(pos, Number(e.target.value))}
-                          className="flex-1 bg-gray-700 text-white font-bold px-2 py-1 rounded border border-white/20 text-sm"
+                          className="flex-1 accent-p5-red"
                         />
-                        <span className="text-white/60 text-sm">BB</span>
+                        <span className="font-p5-en text-sm text-white/80 w-14 text-right">{stack}<span className="text-xs text-white/50 ml-0.5">BB</span></span>
                       </div>
 
                       {/* Mental State */}

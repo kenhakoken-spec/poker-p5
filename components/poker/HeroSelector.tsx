@@ -161,11 +161,11 @@ export default function HeroSelector({ onSelect }: HeroSelectorProps) {
           >
             <button
               type="button"
-              className="w-full py-2 bg-gray-800 text-white font-bold border border-white/20 rounded hover:bg-gray-700"
+              className="block mx-auto px-4 py-1.5 bg-gray-800 text-white font-p5-en text-xs font-bold border border-white/20 rounded hover:bg-gray-700"
               style={{ transform: 'skewX(-5deg)' }}
               onClick={() => setIsOptionsOpen(true)}
             >
-              Options (Stack & Attributes)
+              Options
             </button>
           </motion.div>
         )}

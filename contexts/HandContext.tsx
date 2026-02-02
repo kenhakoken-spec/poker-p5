@@ -17,6 +17,8 @@ interface HandContextType {
   setWinnerAndShowdown: (winnerPosition: Position | Position[], showdownHands?: import('@/types/poker').ShowdownHand[]) => void;
   finishHand: (result?: { won: boolean; amount: number }) => void;
   reset: () => void;
+  restoreState: (hand: Hand | null, state: GameState | null) => void;
+  getLatestState: () => { hand: Hand | null; gameState: GameState | null };
 }
 
 const HandContext = createContext<HandContextType | undefined>(undefined);
@@ -340,6 +342,18 @@ export function HandProvider({ children }: { children: ReactNode }) {
     setGameState(null);
   }, []);
 
+  const restoreState = useCallback((hand: Hand | null, state: GameState | null) => {
+    currentHandRef.current = hand;
+    gameStateRef.current = state;
+    setCurrentHand(hand);
+    setGameState(state);
+  }, []);
+
+  const getLatestState = useCallback(() => ({
+    hand: currentHandRef.current,
+    gameState: gameStateRef.current,
+  }), []);
+
   return (
     <HandContext.Provider
       value={{
@@ -352,6 +366,8 @@ export function HandProvider({ children }: { children: ReactNode }) {
         setWinnerAndShowdown,
         finishHand,
         reset,
+        restoreState,
+        getLatestState,
       }}
     >
       {children}

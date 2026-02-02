@@ -16,11 +16,14 @@ interface PositionSelectorProps {
   onSelect: (position: Position) => void;
   selected?: Position;
   allowedPositions?: Position[];
+  stacks?: { position: string; stack: number }[];
 }
 
-export default function PositionSelector({ onSelect, selected, allowedPositions }: PositionSelectorProps) {
+export default function PositionSelector({ onSelect, selected, allowedPositions, stacks }: PositionSelectorProps) {
   const isAllowed = (pos: Position) =>
     allowedPositions === undefined ? true : allowedPositions.includes(pos);
+
+  const getStack = (pos: Position) => stacks?.find(s => s.position === pos)?.stack;
 
   return (
     <div className="flex flex-col items-center gap-3 sm:gap-4 p-3 sm:p-4 w-full max-w-md mx-auto">
@@ -31,53 +34,62 @@ export default function PositionSelector({ onSelect, selected, allowedPositions 
         transition={{ duration: 0.4 }}
         style={{ transformOrigin: 'center top' }}
       />
-      {POSITION_META.map(({ position, sub, clipPath, skew, accent }, index) => {
+      {POSITION_META.map(({ position, clipPath, skew, accent }, index) => {
         const isSelected = selected === position;
         const allowed = isAllowed(position);
+        const stackValue = getStack(position);
         return (
-          <motion.button
-            key={position}
-            type="button"
-            className={`relative w-full px-5 py-4 sm:px-6 sm:py-5 font-black border-2 text-left flex flex-col justify-center min-h-[3.5rem] sm:min-h-[4rem] ${
-              isSelected ? 'bg-p5-red border-white text-white glow-red-intense' : allowed ? 'bg-black border-white text-white hover:bg-gray-900 glow-red-pulse' : 'bg-gray-900/80 border-gray-600 text-gray-500 cursor-not-allowed'
-            } ${accent === 'red' && !isSelected && allowed ? 'border-p5-red/50' : ''}`}
-            style={{
-              clipPath,
-              transform: `skewX(${skew}deg)`,
-            }}
-            initial={{ opacity: 0, x: index % 2 === 0 ? -20 : 20, rotate: index % 2 === 0 ? -3 : 3 }}
-            animate={
-              allowed && !isSelected
-                ? {
-                    opacity: 1,
-                    x: 0,
-                    rotate: 0,
-                    scale: [1, 1.02, 1],
-                    borderColor: ['rgba(255,255,255,0.5)', 'rgba(255,255,255,0.8)', 'rgba(255,255,255,0.5)'],
-                  }
-                : { opacity: 1, x: 0, rotate: 0 }
-            }
-            transition={
-              allowed && !isSelected
-                ? {
-                    opacity: { delay: index * 0.03, type: 'spring', stiffness: 180, damping: 14 },
-                    x: { delay: index * 0.03, type: 'spring', stiffness: 180, damping: 14 },
-                    rotate: { delay: index * 0.03, type: 'spring', stiffness: 180, damping: 14 },
-                    scale: { duration: 3.5, repeat: Infinity, ease: 'easeInOut', delay: index * 0.3 },
-                    borderColor: { duration: 2, repeat: Infinity, ease: 'easeInOut', delay: index * 0.2 },
-                  }
-                : { delay: index * 0.03, type: 'spring', stiffness: 180, damping: 14 }
-            }
-            whileHover={allowed ? { scale: 1.02, x: 2, borderColor: 'rgba(255,255,255,0.8)' } : {}}
-            whileTap={allowed ? { scale: 0.92 } : {}}
-            onClick={() => allowed && onSelect(position)}
-            disabled={!allowed}
-          >
-            <span className="font-p5-en text-xl sm:text-2xl tracking-tight">{position}</span>
-            <span className={`text-xs sm:text-sm font-bold mt-1 ${isSelected ? 'text-white/90' : 'text-gray-400'}`}>
-              {sub}
-            </span>
-          </motion.button>
+          <div key={position} className="flex items-center w-full gap-3">
+            <motion.button
+              type="button"
+              className={`relative flex-1 px-5 py-4 sm:px-6 sm:py-5 font-black border-2 flex items-center justify-center min-h-[3.5rem] sm:min-h-[4rem] ${
+                isSelected ? 'bg-p5-red border-white text-white glow-red-intense' : allowed ? 'bg-black border-white text-white hover:bg-gray-900 glow-red-pulse' : 'bg-gray-900/80 border-gray-600 text-gray-500 cursor-not-allowed'
+              } ${accent === 'red' && !isSelected && allowed ? 'border-p5-red/50' : ''}`}
+              style={{
+                clipPath,
+                transform: `skewX(${skew}deg)`,
+              }}
+              initial={{ opacity: 0, x: index % 2 === 0 ? -20 : 20, rotate: index % 2 === 0 ? -3 : 3 }}
+              animate={
+                allowed && !isSelected
+                  ? {
+                      opacity: 1,
+                      x: 0,
+                      rotate: 0,
+                      scale: [1, 1.02, 1],
+                      borderColor: ['rgba(255,255,255,0.5)', 'rgba(255,255,255,0.8)', 'rgba(255,255,255,0.5)'],
+                    }
+                  : { opacity: 1, x: 0, rotate: 0 }
+              }
+              transition={
+                allowed && !isSelected
+                  ? {
+                      opacity: { delay: index * 0.03, type: 'spring', stiffness: 180, damping: 14 },
+                      x: { delay: index * 0.03, type: 'spring', stiffness: 180, damping: 14 },
+                      rotate: { delay: index * 0.03, type: 'spring', stiffness: 180, damping: 14 },
+                      scale: { duration: 3.5, repeat: Infinity, ease: 'easeInOut', delay: index * 0.3 },
+                      borderColor: { duration: 2, repeat: Infinity, ease: 'easeInOut', delay: index * 0.2 },
+                    }
+                  : { delay: index * 0.03, type: 'spring', stiffness: 180, damping: 14 }
+              }
+              whileHover={allowed ? { scale: 1.02, x: 2, borderColor: 'rgba(255,255,255,0.8)' } : {}}
+              whileTap={allowed ? { scale: 0.92 } : {}}
+              onClick={() => allowed && onSelect(position)}
+              disabled={!allowed}
+            >
+              <span className="font-p5-en text-xl sm:text-2xl tracking-tight">{position}</span>
+            </motion.button>
+            {stackValue !== undefined && (
+              <span
+                className={`font-p5-en text-sm whitespace-nowrap shrink-0 min-w-[3.5rem] text-right ${
+                  isSelected ? 'text-white/70' : 'text-gray-500'
+                }`}
+                style={{ transform: 'skewX(-5deg)' }}
+              >
+                {stackValue}<span className={`text-xs ml-0.5 ${isSelected ? 'text-white/50' : 'text-gray-600'}`}>BB</span>
+              </span>
+            )}
+          </div>
         );
       })}
     </div>

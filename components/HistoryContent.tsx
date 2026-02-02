@@ -123,7 +123,7 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
   };
 
   return (
-    <main className="min-h-screen bg-black text-white p-4 sm:p-6" data-testid="history-container">
+    <main className="h-full overflow-y-auto scroll-smooth history-scroll bg-black text-white p-4 sm:p-6" data-testid="history-container">
       <div className="max-w-lg mx-auto">
         <h1
           className="font-p5-en text-3xl sm:text-5xl font-black mb-4 sm:mb-6"
@@ -138,7 +138,7 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
             <a
               href="https://gemini.google.com/app"
               target="_blank"
-              rel="noopener"
+              rel="noopener noreferrer"
               style={{
                 display: 'inline-block',
                 padding: '6px 10px',
@@ -414,7 +414,7 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
                             <a
                               href="https://gemini.google.com/app"
                               target="_blank"
-                              rel="noopener"
+                              rel="noopener noreferrer"
                               style={{
                                 display: 'inline-block',
                                 padding: '6px 10px',

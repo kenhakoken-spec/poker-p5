@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useHand } from '@/contexts/HandContext';
-import type { Position, Action, BetSize, ActionRecord, Street, ShowdownHand, PotWinner, MentalState, PlayStyle } from '@/types/poker';
+import type { Position, Action, BetSize, ActionRecord, Street, ShowdownHand, PotWinner, MentalState, PlayStyle, Hand, GameState } from '@/types/poker';
 import { getActivePlayers, getActingPlayers, getNextToAct, getActionOrder } from '@/utils/pokerUtils';
 import { getTotalContributions, getContributionsThisStreet, getMaxContributionThisStreet, isStreetClosed } from '@/utils/potUtils';
 import { getPreflopBetSizes } from '@/utils/bettingUtils';
@@ -73,16 +73,38 @@ function P5Button({ children, className = '', style, onClick, disabled }: {
 }
 
 export default function RecordPage() {
-  const { gameState, currentHand, startNewHand, addAction, addActions, setBoardCards, setWinnerAndShowdown, finishHand, reset } = useHand();
+  const { gameState, currentHand, startNewHand, addAction, addActions, setBoardCards, setWinnerAndShowdown, finishHand, reset, restoreState, getLatestState } = useHand();
   const [step, setStep] = useState<Step>('start');
-  // BUG-19: スタックベースのステップ履歴
-  const [stepHistory, setStepHistory] = useState<Step[]>(['start']);
+
+  // BUG-19 + BUG-47: スナップショット付きステップ履歴（バック時にUI状態+ゲーム状態を復元）
+  type StepHistoryEntry = {
+    step: Step;
+    selectedPosition: Position | null;
+    pendingBoardStreet: BoardStreet | null;
+    handSnapshot: Hand | null;
+    gameStateSnapshot: GameState | null;
+  };
+  const [stepHistory, setStepHistory] = useState<StepHistoryEntry[]>([
+    { step: 'start', selectedPosition: null, pendingBoardStreet: null, handSnapshot: null, gameStateSnapshot: null },
+  ]);
+
   const skipAutoRef = useRef(false);
-  /** BUG-25: ストリート境界追跡 */
-  const streetBoundaryIndexRef = useRef(1);
-  const lastBoundaryStreetRef = useRef<Street | null>(null);
-  const [selectedPosition, setSelectedPosition] = useState<Position | null>(null);
-  const [pendingBoardStreet, setPendingBoardStreet] = useState<BoardStreet | null>(null);
+
+  // BUG-47: selectedPosition / pendingBoardStreet のref同期ラッパー
+  // React batching でsetState後もref経由で最新値をpushStepに渡す
+  const [selectedPosition, _setSelectedPosition] = useState<Position | null>(null);
+  const selectedPositionRef = useRef<Position | null>(null);
+  const setSelectedPosition = (pos: Position | null) => {
+    selectedPositionRef.current = pos;
+    _setSelectedPosition(pos);
+  };
+
+  const [pendingBoardStreet, _setPendingBoardStreet] = useState<BoardStreet | null>(null);
+  const pendingBoardStreetRef = useRef<BoardStreet | null>(null);
+  const setPendingBoardStreet = (street: BoardStreet | null) => {
+    pendingBoardStreetRef.current = street;
+    _setPendingBoardStreet(street);
+  };
   const [selectedWinner, setSelectedWinner] = useState<Position | Position[] | null>(null);
   const [flowError, setFlowError] = useState<string | null>(null);
   /** プリフロのオープナー（対向者ステップの基準） */
@@ -120,9 +142,16 @@ export default function RecordPage() {
     };
   }, [step]);
 
-  /** BUG-19: Push step to history stack */
+  /** BUG-19 + BUG-47: Push step to history stack with state snapshot */
   const pushStep = (newStep: Step) => {
-    setStepHistory(prev => [...prev, newStep]);
+    const { hand, gameState: gs } = getLatestState();
+    setStepHistory(prev => [...prev, {
+      step: newStep,
+      selectedPosition: selectedPositionRef.current,
+      pendingBoardStreet: pendingBoardStreetRef.current,
+      handSnapshot: hand ? structuredClone(hand) : null,
+      gameStateSnapshot: gs ? structuredClone(gs) : null,
+    }]);
     setStep(newStep);
   };
 
@@ -147,11 +176,7 @@ export default function RecordPage() {
   const board = gameState?.board ?? currentHand?.board ?? [];
   const boardLength = board.length;
 
-  // BUG-25: ストリート境界検出（コンポーネント本体で検出、useEffectより先に設定）
-  if (gameState && gameState.street !== 'preflop' && gameState.street !== lastBoundaryStreetRef.current) {
-    streetBoundaryIndexRef.current = stepHistory.length;
-    lastBoundaryStreetRef.current = gameState.street;
-  }
+  // BUG-47: ストリート境界ブロック撤廃（スナップショット復元で安全にクロスストリートバック可能）
 
   // B6: ストリート遷移バナー検知
   useEffect(() => {
@@ -577,10 +602,8 @@ export default function RecordPage() {
   const handleTop = () => {
     reset();
     setStep('start');
-    setStepHistory(['start']);
+    setStepHistory([{ step: 'start', selectedPosition: null, pendingBoardStreet: null, handSnapshot: null, gameStateSnapshot: null }]);
     skipAutoRef.current = true;
-    streetBoundaryIndexRef.current = 1;
-    lastBoundaryStreetRef.current = null;
     setSelectedPosition(null);
     setPreflopOpener(null);
     setPreflopNextToAct(null);
@@ -595,7 +618,7 @@ export default function RecordPage() {
     setShowShowdownSheet(false);
   };
 
-  /** BUG-19: Back — スタックベースの戻り */
+  /** BUG-19 + BUG-47: Back — スナップショット復元方式 */
   const handleBack = () => {
     // preflopOpponents sub-state: アクション選択中なら選択をクリアするだけ
     if (step === 'preflopOpponents' && preflopNextToAct !== null) {
@@ -604,21 +627,28 @@ export default function RecordPage() {
       return;
     }
 
-    // BUG-25: ストリート境界チェック
-    if (stepHistory.length <= streetBoundaryIndexRef.current) return;
-
-    // 現在ステップに応じたstate cleanup
-    if (step === 'action') setSelectedPosition(null);
-    if (step === 'selectBoard') setPendingBoardStreet(null);
+    if (stepHistory.length <= 1) return;
 
     skipAutoRef.current = true;
     const newHistory = stepHistory.slice(0, -1);
+    const prevEntry = newHistory[newHistory.length - 1];
+
     setStepHistory(newHistory);
-    setStep(newHistory[newHistory.length - 1]);
+    setStep(prevEntry.step);
+
+    // BUG-47: UI状態の復元
+    setSelectedPosition(prevEntry.selectedPosition);
+    setPendingBoardStreet(prevEntry.pendingBoardStreet);
+
+    // BUG-47: ゲーム状態の復元（アクション・ボードカードのアンドゥ）
+    restoreState(
+      prevEntry.handSnapshot ? structuredClone(prevEntry.handSnapshot) : null,
+      prevEntry.gameStateSnapshot ? structuredClone(prevEntry.gameStateSnapshot) : null,
+    );
   };
 
-  /** BUG-25: Back可能判定 — ストリート境界 + サブステート考慮 */
-  const canGoBack = stepHistory.length > streetBoundaryIndexRef.current ||
+  /** BUG-47: Back可能判定 — サブステート考慮 */
+  const canGoBack = stepHistory.length > 1 ||
     (step === 'preflopOpponents' && preflopNextToAct !== null);
 
   /** UI-35: Navigation overlay (fixed bottom-left) + UI-41: Back disabled state */
@@ -1454,9 +1484,7 @@ export default function RecordPage() {
             }
             // タブ切替せず次のハンドへ
             setStep('hero');
-            setStepHistory(['hero']);
-            streetBoundaryIndexRef.current = 1;
-            lastBoundaryStreetRef.current = null;
+            setStepHistory([{ step: 'hero', selectedPosition: null, pendingBoardStreet: null, handSnapshot: null, gameStateSnapshot: null }]);
             setSelectedPosition(null);
             setPreflopOpener(null);
             setPreflopNextToAct(null);
@@ -1693,6 +1721,7 @@ export default function RecordPage() {
                   onSelect={handlePositionSelect}
                   selected={selectedPosition ?? undefined}
                   allowedPositions={nextToAct ? [nextToAct] : []}
+                  stacks={gameState?.players.map(p => ({ position: p.position, stack: p.stack }))}
                 />
               </div>
               {nextToAct && (
