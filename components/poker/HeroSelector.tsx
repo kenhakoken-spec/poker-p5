@@ -2,8 +2,10 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState } from 'react';
-import type { Position } from '@/types/poker';
+import type { Position, MentalState, PlayStyle, InitialStackConfig, PlayerAttribute } from '@/types/poker';
 import SuitBasedCardReel from './SuitBasedCardReel';
+import StackOptionsPanel from './StackOptionsPanel';
+import { POKER_CONFIG } from '@/utils/pokerConfig';
 
 const POSITIONS: Position[] = ['UTG', 'MP', 'CO', 'BTN', 'SB', 'BB'];
 
@@ -18,7 +20,12 @@ function getSuitColorClass(card: string): string {
 }
 
 interface HeroSelectorProps {
-  onSelect: (heroPosition: Position, heroHand?: [string, string]) => void;
+  onSelect: (
+    heroPosition: Position,
+    heroHand?: [string, string],
+    initialStacks?: InitialStackConfig[],
+    playerAttributes?: PlayerAttribute[]
+  ) => void;
 }
 
 export default function HeroSelector({ onSelect }: HeroSelectorProps) {
@@ -26,6 +33,15 @@ export default function HeroSelector({ onSelect }: HeroSelectorProps) {
   const [card1, setCard1] = useState<string | null>(null);
   const [card2, setCard2] = useState<string | null>(null);
   const [selectionComplete, setSelectionComplete] = useState(false);
+
+  // FEAT-1/2: Stack & Attribute Options
+  const [isOptionsOpen, setIsOptionsOpen] = useState(false);
+  const [initialStacks, setInitialStacks] = useState<Map<Position, number>>(
+    new Map(POSITIONS.map((pos) => [pos, POKER_CONFIG.defaultStack]))
+  );
+  const [playerAttributes, setPlayerAttributes] = useState<Map<Position, { mentalState: MentalState; playStyle: PlayStyle }>>(
+    new Map(POSITIONS.map((pos) => [pos, { mentalState: 'neutral', playStyle: 'neutral' }]))
+  );
 
   const hand: [string, string] | null =
     card1 && card2 ? (card1 < card2 ? [card1, card2] : [card2, card1]) : null;
@@ -49,9 +65,44 @@ export default function HeroSelector({ onSelect }: HeroSelectorProps) {
     setCard2(null);
   };
 
+  const handleStackChange = (position: Position, stack: number) => {
+    setInitialStacks(new Map(initialStacks.set(position, stack)));
+  };
+
+  const handleBulkStackChange = (stack: number) => {
+    const newStacks = new Map<Position, number>();
+    POSITIONS.forEach((pos) => newStacks.set(pos, stack));
+    setInitialStacks(newStacks);
+  };
+
+  const handleAttributeChange = (position: Position, mental: MentalState, style: PlayStyle) => {
+    setPlayerAttributes(new Map(playerAttributes.set(position, { mentalState: mental, playStyle: style })));
+  };
+
   const handleConfirm = () => {
     if (selectedPosition) {
-      onSelect(selectedPosition, hand ?? undefined);
+      // Convert Maps to arrays only if non-default values exist
+      const stacksArray: InitialStackConfig[] = [];
+      const attributesArray: PlayerAttribute[] = [];
+
+      initialStacks.forEach((stack, pos) => {
+        if (stack !== POKER_CONFIG.defaultStack) {
+          stacksArray.push({ position: pos, stack });
+        }
+      });
+
+      playerAttributes.forEach((attrs, pos) => {
+        if (attrs.mentalState !== 'neutral' || attrs.playStyle !== 'neutral') {
+          attributesArray.push({ position: pos, mentalState: attrs.mentalState, playStyle: attrs.playStyle });
+        }
+      });
+
+      onSelect(
+        selectedPosition,
+        hand ?? undefined,
+        stacksArray.length > 0 ? stacksArray : undefined,
+        attributesArray.length > 0 ? attributesArray : undefined
+      );
     }
   };
 
@@ -100,6 +151,24 @@ export default function HeroSelector({ onSelect }: HeroSelectorProps) {
             </motion.button>
           ))}
         </div>
+
+        {/* Options button: Position選択後に表示 */}
+        {selectedPosition && (
+          <motion.div
+            className="max-w-sm mx-auto w-full mt-3"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <button
+              type="button"
+              className="w-full py-2 bg-gray-800 text-white font-bold border border-white/20 rounded hover:bg-gray-700"
+              style={{ transform: 'skewX(-5deg)' }}
+              onClick={() => setIsOptionsOpen(true)}
+            >
+              Options (Stack & Attributes)
+            </button>
+          </motion.div>
+        )}
 
         {/* ハンド（必須）: 1デッキから2枚・リール表示 */}
         {selectedPosition && (
@@ -230,6 +299,18 @@ export default function HeroSelector({ onSelect }: HeroSelectorProps) {
           </>
         )}
       </div>
+
+      {/* FEAT-1/2: Stack Options Panel */}
+      <StackOptionsPanel
+        positions={POSITIONS}
+        initialStacks={initialStacks}
+        playerAttributes={playerAttributes}
+        onStackChange={handleStackChange}
+        onBulkStackChange={handleBulkStackChange}
+        onAttributeChange={handleAttributeChange}
+        onClose={() => setIsOptionsOpen(false)}
+        isOpen={isOptionsOpen}
+      />
     </div>
   );
 }

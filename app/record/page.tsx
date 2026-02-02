@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useHand } from '@/contexts/HandContext';
-import type { Position, Action, BetSize, ActionRecord, Street, ShowdownHand, PotWinner } from '@/types/poker';
+import type { Position, Action, BetSize, ActionRecord, Street, ShowdownHand, PotWinner, MentalState, PlayStyle } from '@/types/poker';
 import { getActivePlayers, getActingPlayers, getNextToAct, getActionOrder } from '@/utils/pokerUtils';
 import { getTotalContributions, getContributionsThisStreet, getMaxContributionThisStreet, isStreetClosed } from '@/utils/potUtils';
 import { getPreflopBetSizes } from '@/utils/bettingUtils';
@@ -264,9 +264,14 @@ export default function RecordPage() {
 
   const handleStart = () => pushStep('hero');
 
-  const handleHeroSelect = (heroPosition: Position, heroHand?: [string, string]) => {
+  const handleHeroSelect = (
+    heroPosition: Position,
+    heroHand?: [string, string],
+    initialStacks?: { position: Position; stack: number }[],
+    playerAttributes?: { position: Position; mentalState: MentalState; playStyle: PlayStyle }[]
+  ) => {
     const positions: Position[] = ['UTG', 'MP', 'CO', 'BTN', 'SB', 'BB'];
-    startNewHand(positions, heroPosition, heroHand);
+    startNewHand(positions, heroPosition, heroHand, initialStacks, playerAttributes);
     setPreflopOpener(null);
     setPreflopNextToAct(null);
     setPotWinnerMap(new Map());
@@ -1285,7 +1290,10 @@ export default function RecordPage() {
 
     // 動的損益計算: ポットからヒーローの投入額を引く
     const heroPos = currentHand?.heroPosition;
-    const contributions = gameState ? getTotalContributions(gameState.actions) : new Map<string, number>();
+    const initialStacksMap = gameState
+      ? new Map(gameState.players.map((p) => [p.position, p.initialStack ?? POKER_CONFIG.defaultStack]))
+      : undefined;
+    const contributions = gameState ? getTotalContributions(gameState.actions, initialStacksMap) : new Map<string, number>();
     const heroContribution = heroPos ? (contributions.get(heroPos) ?? 0) : 0;
     const totalPot = gameState?.pot ?? 0;
 

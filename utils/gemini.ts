@@ -52,6 +52,8 @@ export function generateHandExport(hand: Hand): string {
     notes: hand.notes,
     finalPot: calculateCurrentPot(hand.actions),
     actions: thActions,
+    initialStacks: hand.initialStacks ?? undefined,
+    playerAttributes: hand.playerAttributes ?? undefined,
   };
   return `${GEMINI_PROMPT_SINGLE}\n\n${JSON.stringify(handForExport, null, 2)}`;
 }

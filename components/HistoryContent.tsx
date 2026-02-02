@@ -123,7 +123,7 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
   };
 
   return (
-    <main className="min-h-screen bg-black text-white p-4 sm:p-6">
+    <main className="min-h-screen bg-black text-white p-4 sm:p-6" data-testid="history-container">
       <div className="max-w-lg mx-auto">
         <h1
           className="font-p5-en text-3xl sm:text-5xl font-black mb-4 sm:mb-6"
@@ -167,7 +167,7 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
           >
             {filterFav ? '★ Favorites' : '☆ Favorites'}
           </motion.button>
-          <span className="text-xs text-gray-600 ml-auto">
+          <span className="text-xs text-gray-600 ml-auto" data-testid="history-hand-count">
             {filtered.length} hands
           </span>
         </div>
@@ -178,9 +178,13 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
             {filterFav ? 'No favorites yet' : 'No hands recorded'}
           </p>
         ) : (
-          <div className="space-y-1.5">
+          <div className="space-y-1.5" data-testid="history-hand-list">
             {filtered.map((hand, index) => {
-              const pot = calculateCurrentPot(hand.actions);
+              // FEAT-1: initialStacks がある場合はポット計算に反映
+              const stacksMap = hand.initialStacks
+                ? new Map(hand.initialStacks.map(s => [s.position as string, s.stack]))
+                : undefined;
+              const pot = calculateCurrentPot(hand.actions, stacksMap);
               const isExpanded = expandedId === hand.id;
               const isEditingMemo = editingMemoId === hand.id;
               const dateStr = new Date(hand.date).toLocaleString('en-US', {
@@ -203,6 +207,7 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
                   {/* Summary section */}
                   <div
                     className="px-3 py-2 cursor-pointer select-none hover:bg-white/5 transition-colors"
+                    data-testid={`hand-toggle-${hand.id}`}
                     onClick={() => setExpandedId(prev => prev === hand.id ? null : hand.id)}
                   >
                     {/* Line 1: core info + cards */}
@@ -294,8 +299,37 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
                         exit={{ height: 0, opacity: 0 }}
                         transition={{ duration: 0.25, ease: 'easeInOut' }}
                         className="overflow-hidden"
+                        data-testid={`hand-expanded-${hand.id}`}
                       >
-                        <div className="px-3 pb-3 pt-1.5 border-t border-white/10 space-y-2">
+                        <div className="px-3 pb-3 pt-1.5 border-t border-white/10 space-y-2" data-testid={`hand-detail-${hand.id}`}>
+                          {/* FEAT-1/2: Non-default stacks & player attributes */}
+                          {(hand.initialStacks || hand.playerAttributes) && (
+                            <div className="space-y-1" data-testid="hand-stacks-attrs">
+                              {/* Stacks */}
+                              {hand.initialStacks && hand.initialStacks.length > 0 && (
+                                <div data-testid="hand-stacks">
+                                  <span className="text-[10px] text-gray-500">[Stacks] </span>
+                                  <span className="text-xs text-gray-300">
+                                    {hand.initialStacks.map(s => `${s.position}: ${s.stack}bb`).join(' | ')}
+                                  </span>
+                                </div>
+                              )}
+                              {/* Player Attributes */}
+                              {hand.playerAttributes && hand.playerAttributes.length > 0 && (
+                                <div data-testid="hand-player-attrs">
+                                  <span className="text-[10px] text-gray-500">[Players] </span>
+                                  <span className="text-xs text-gray-300">
+                                    {hand.playerAttributes.map(p => {
+                                      const parts: string[] = [];
+                                      if (p.mentalState && p.mentalState !== 'neutral') parts.push(p.mentalState);
+                                      if (p.playStyle && p.playStyle !== 'neutral') parts.push(p.playStyle.toUpperCase());
+                                      return `${p.position}: ${parts.join('/')}`;
+                                    }).join(' | ')}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          )}
                           {/* Actions by street */}
                           {STREET_ORDER.map(st => {
                             const acts = streets[st];

@@ -95,7 +95,8 @@ export function isStreetClosed(
 // ストリートごとのポットを計算
 export function calculatePotForStreet(
   actions: ActionRecord[],
-  street: Street
+  street: Street,
+  initialStacks?: Map<string, number>
 ): number {
   let pot = INITIAL_POT;
   
@@ -143,19 +144,21 @@ export function calculatePotForStreet(
   // BUG-9修正: ブラインドがスタックから控除されないため、
   // オールイン時にplayerContributionsがinitialStackを超える場合がある。
   // ポットを各プレイヤーのキャップ済み投入額の合計として再計算する。
+  // FEAT-1: per-player initialStackでキャップ（未指定時はDEFAULT_INITIAL_STACK）
   let correctedPot = 0;
-  playerContributions.forEach((contrib) => {
-    correctedPot += Math.min(contrib, DEFAULT_INITIAL_STACK);
+  playerContributions.forEach((contrib, pos) => {
+    const playerInitialStack = initialStacks?.get(pos) ?? DEFAULT_INITIAL_STACK;
+    correctedPot += Math.min(contrib, playerInitialStack);
   });
   return correctedPot;
 }
 
 // 現在のポットを計算
-export function calculateCurrentPot(actions: ActionRecord[]): number {
+export function calculateCurrentPot(actions: ActionRecord[], initialStacks?: Map<string, number>): number {
   // 最後のストリートを取得
   const streets: Street[] = ['preflop', 'flop', 'turn', 'river'];
   let lastStreet: Street = 'preflop';
-  
+
   for (const action of actions) {
     const streetIndex = streets.indexOf(action.street);
     const lastStreetIndex = streets.indexOf(lastStreet);
@@ -163,31 +166,31 @@ export function calculateCurrentPot(actions: ActionRecord[]): number {
       lastStreet = action.street;
     }
   }
-  
-  return calculatePotForStreet(actions, lastStreet);
+
+  return calculatePotForStreet(actions, lastStreet, initialStacks);
 }
 /** 指定ストリート開始前（前ストリート終了時点）のポット */
-export function getPotBeforeStreet(actions: ActionRecord[], street: Street): number {
+export function getPotBeforeStreet(actions: ActionRecord[], street: Street, initialStacks?: Map<string, number>): number {
   const streets: Street[] = ['preflop', 'flop', 'turn', 'river'];
   const idx = streets.indexOf(street);
   if (idx <= 0) return INITIAL_POT;
-  return calculatePotForStreet(actions, streets[idx - 1]);
+  return calculatePotForStreet(actions, streets[idx - 1], initialStacks);
 }
 
 /** 指定ストリートでの増分（このストリートで増えたポット額） */
-export function getPotIncreaseThisStreet(actions: ActionRecord[], street: Street): number {
-  const total = calculatePotForStreet(actions, street);
-  const before = getPotBeforeStreet(actions, street);
+export function getPotIncreaseThisStreet(actions: ActionRecord[], street: Street, initialStacks?: Map<string, number>): number {
+  const total = calculatePotForStreet(actions, street, initialStacks);
+  const before = getPotBeforeStreet(actions, street, initialStacks);
   return Math.max(0, total - before);
 }
 
 /** 各アクション直後のポット（BB）。TH準拠エクスポート用 */
-export function getPotAfterEachAction(actions: ActionRecord[]): number[] {
-  return actions.map((_, i) => calculateCurrentPot(actions.slice(0, i + 1)));
+export function getPotAfterEachAction(actions: ActionRecord[], initialStacks?: Map<string, number>): number[] {
+  return actions.map((_, i) => calculateCurrentPot(actions.slice(0, i + 1), initialStacks));
 }
 
 /** 全ストリートを通じた各プレイヤーの累計投入額（SB/BBブラインド含む） */
-export function getTotalContributions(actions: ActionRecord[]): Map<string, number> {
+export function getTotalContributions(actions: ActionRecord[], initialStacks?: Map<string, number>): Map<string, number> {
   const contributions = new Map<string, number>();
   // ブラインド初期値
   contributions.set('SB', POKER_CONFIG.blinds.sb);
@@ -244,9 +247,11 @@ export function getTotalContributions(actions: ActionRecord[]): Map<string, numb
   }
 
   // BUG-9修正: 各プレイヤーのcontributionをinitialStackでキャップ
+  // FEAT-1: per-player initialStackでキャップ（未指定時はDEFAULT_INITIAL_STACK）
   for (const [pos, amount] of contributions) {
-    if (amount > DEFAULT_INITIAL_STACK) {
-      contributions.set(pos, DEFAULT_INITIAL_STACK);
+    const playerInitialStack = initialStacks?.get(pos) ?? DEFAULT_INITIAL_STACK;
+    if (amount > playerInitialStack) {
+      contributions.set(pos, playerInitialStack);
     }
   }
 
@@ -254,8 +259,8 @@ export function getTotalContributions(actions: ActionRecord[]): Map<string, numb
 }
 
 /** サイドポットを計算する（オールイン時のポット分割） */
-export function calculateSidePots(actions: ActionRecord[], players: PlayerState[]): SidePot[] {
-  const contributions = getTotalContributions(actions);
+export function calculateSidePots(actions: ActionRecord[], players: PlayerState[], initialStacks?: Map<string, number>): SidePot[] {
+  const contributions = getTotalContributions(actions, initialStacks);
 
   // BUG-33: fold-basedでアクティブ判定（p.activeフラグに依存しない）
   const foldedPositions = new Set(

@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useCallback, useRef, ReactNode } from 'react';
-import type { Hand, ActionRecord, Position, Street, GameState, PlayerState, ShowdownHand } from '@/types/poker';
+import type { Hand, ActionRecord, Position, Street, GameState, PlayerState, ShowdownHand, InitialStackConfig, PlayerAttribute } from '@/types/poker';
 import { addHand } from '@/utils/storage';
 import { getActionOrder, getActivePlayers, getActingPlayers } from '@/utils/pokerUtils';
 import { calculateCurrentPot, isStreetClosed, getContributionsThisStreet, getMaxContributionThisStreet, calculateSidePots } from '@/utils/potUtils';
@@ -10,7 +10,7 @@ import { POKER_CONFIG } from '@/utils/pokerConfig';
 interface HandContextType {
   currentHand: Hand | null;
   gameState: GameState | null;
-  startNewHand: (positions: Position[], heroPosition: Position | null, heroHand?: [string, string]) => void;
+  startNewHand: (positions: Position[], heroPosition: Position | null, heroHand?: [string, string], initialStacks?: InitialStackConfig[], playerAttributes?: PlayerAttribute[]) => void;
   addAction: (action: ActionRecord) => void;
   addActions: (actions: ActionRecord[]) => void;
   setBoardCards: (street: 'flop' | 'turn' | 'river', cards: string[]) => void;
@@ -32,7 +32,12 @@ export function HandProvider({ children }: { children: ReactNode }) {
   currentHandRef.current = currentHand;
   gameStateRef.current = gameState;
 
-  const startNewHand = useCallback((positions: Position[], heroPosition: Position | null, heroHand?: [string, string]) => {
+  const startNewHand = useCallback((positions: Position[], heroPosition: Position | null, heroHand?: [string, string], initialStacks?: InitialStackConfig[], playerAttributes?: PlayerAttribute[]) => {
+    // FEAT-1: デフォルトと異なるスタックがある場合のみ保存
+    const hasNonDefaultStacks = initialStacks && initialStacks.some(s => s.stack !== POKER_CONFIG.defaultStack);
+    // FEAT-2: Neutral以外がある場合のみ保存
+    const hasNonDefaultAttrs = playerAttributes && playerAttributes.some(a => a.mentalState !== 'neutral' || a.playStyle !== 'neutral');
+
     const hand: Hand = {
       id: Date.now().toString(),
       date: Date.now(),
@@ -40,6 +45,8 @@ export function HandProvider({ children }: { children: ReactNode }) {
       heroPosition,
       heroHand,
       actions: [],
+      ...(hasNonDefaultStacks ? { initialStacks } : {}),
+      ...(hasNonDefaultAttrs ? { playerAttributes } : {}),
     };
 
     // BUG-28 + STACK-RULE-001: ブラインドをスタックから控除
@@ -47,12 +54,24 @@ export function HandProvider({ children }: { children: ReactNode }) {
       SB: POKER_CONFIG.blinds.sb,
       BB: POKER_CONFIG.blinds.bb,
     };
-    const players: PlayerState[] = positions.map((pos) => ({
-      position: pos,
-      stack: POKER_CONFIG.defaultStack - (blindAmounts[pos] ?? 0),
-      active: true,
-      isAllIn: false,
-    }));
+    // FEAT-1: ポジション別初期スタック
+    const getInitialStack = (pos: Position): number => {
+      const config = initialStacks?.find(s => s.position === pos);
+      return config?.stack ?? POKER_CONFIG.defaultStack;
+    };
+    const players: PlayerState[] = positions.map((pos) => {
+      const posInitialStack = getInitialStack(pos);
+      const attr = playerAttributes?.find(a => a.position === pos);
+      return {
+        position: pos,
+        stack: posInitialStack - (blindAmounts[pos] ?? 0),
+        initialStack: posInitialStack,
+        active: true,
+        isAllIn: false,
+        ...(attr?.mentalState && attr.mentalState !== 'neutral' ? { mentalState: attr.mentalState } : {}),
+        ...(attr?.playStyle && attr.playStyle !== 'neutral' ? { playStyle: attr.playStyle } : {}),
+      };
+    });
 
     const state: GameState = {
       street: 'preflop',
@@ -113,7 +132,9 @@ export function HandProvider({ children }: { children: ReactNode }) {
       return player;
     });
 
-    const newPot = calculateCurrentPot(newActions);
+    // FEAT-1: players配列のinitialStackからMap生成（potUtils透過用）
+    const initialStacksMap = new Map(state.players.map(p => [p.position as string, p.initialStack ?? POKER_CONFIG.defaultStack]));
+    const newPot = calculateCurrentPot(newActions, initialStacksMap);
     // BUG-14: Short all-in should not lower lastBet; use Math.max to prevent it
     const actionAmount = fixedAction.size?.amount;
     const newLastBet = actionAmount !== undefined
@@ -122,7 +143,7 @@ export function HandProvider({ children }: { children: ReactNode }) {
 
     // サイドポット計算（all-inが発生した場合）
     const hasAllIn = updatedPlayers.some(p => p.isAllIn && p.active);
-    const sidePots = hasAllIn ? calculateSidePots(newActions, updatedPlayers) : undefined;
+    const sidePots = hasAllIn ? calculateSidePots(newActions, updatedPlayers, initialStacksMap) : undefined;
 
     // ストリート進行とハンド終了条件の判定
     let newStreet = state.street;
@@ -212,7 +233,9 @@ export function HandProvider({ children }: { children: ReactNode }) {
           return { ...p, stack: newStack, lastAction: fa.action, isAllIn };
         });
 
-        const newPot = calculateCurrentPot(newActions);
+        // FEAT-1: players配列のinitialStackからMap生成（potUtils透過用）
+        const initialStacksMap = new Map(state.players.map(pl => [pl.position as string, pl.initialStack ?? POKER_CONFIG.defaultStack]));
+        const newPot = calculateCurrentPot(newActions, initialStacksMap);
         // BUG-14: Short all-in should not lower lastBet
         const actionAmt = fa.size?.amount;
         const newLastBet = actionAmt !== undefined
@@ -221,7 +244,7 @@ export function HandProvider({ children }: { children: ReactNode }) {
 
         // サイドポット計算
         const hasAllIn = updatedPlayers.some(p => p.isAllIn && p.active);
-        const sidePots = hasAllIn ? calculateSidePots(newActions, updatedPlayers) : undefined;
+        const sidePots = hasAllIn ? calculateSidePots(newActions, updatedPlayers, initialStacksMap) : undefined;
 
         let newStreet = state.street;
         const activePlayers = getActivePlayers(updatedPlayers);

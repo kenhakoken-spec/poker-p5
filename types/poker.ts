@@ -7,6 +7,22 @@ export type Action = 'fold' | 'check' | 'call' | 'bet' | 'raise' | 'all-in';
 // ストリート定義
 export type Street = 'preflop' | 'flop' | 'turn' | 'river';
 
+// FEAT-2: プレイヤー属性（ゲームロジック不干渉、メモ/分析用）
+export type MentalState = 'neutral' | 'tilted';
+export type PlayStyle = 'neutral' | 'tp' | 'tag' | 'lp' | 'lag';
+
+export interface PlayerAttribute {
+  position: Position;
+  mentalState: MentalState;
+  playStyle: PlayStyle;
+}
+
+// FEAT-1: ポジション別初期スタック設定
+export interface InitialStackConfig {
+  position: Position;
+  stack: number; // 1-300 BB
+}
+
 // ベットサイズタイプ
 export type BetSizeType = 'bet-relative' | 'pot-relative';
 
@@ -51,6 +67,8 @@ export interface Hand {
   notes?: string;
   memo?: string;
   favorite?: boolean;
+  initialStacks?: InitialStackConfig[]; // FEAT-1: デフォルトと異なる場合のみ保存
+  playerAttributes?: PlayerAttribute[]; // FEAT-2: Neutral以外がある場合のみ保存
 }
 
 // ヒストリー（全ハンド）
@@ -72,10 +90,13 @@ export interface PotWinner {
 // プレイヤーステート
 export interface PlayerState {
   position: Position;
-  stack: number; // BB単位
+  stack: number; // BB単位（実行時残スタック）
+  initialStack?: number; // FEAT-1: 初期スタック（未設定時はPOKER_CONFIG.defaultStack）
   active: boolean;
   isAllIn: boolean;
   lastAction?: Action;
+  mentalState?: MentalState; // FEAT-2（ゲームロジック不干渉）
+  playStyle?: PlayStyle; // FEAT-2（ゲームロジック不干渉）
 }
 
 // ゲームステート
