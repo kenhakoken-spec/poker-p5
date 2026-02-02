@@ -191,6 +191,212 @@ describe('Side Pot Calculation', () => {
     });
   });
 
+  describe('UI-65: サイドポット計算TDD（金額厳密検証）', () => {
+    it('2人オールイン（異スタック）: 50BB vs 100BB', () => {
+      // UTG(50BB) all-in, MP(100BB) all-in
+      // SB/BB fold → blinds still contribute 0.5 + 1 = 1.5
+      const actions: ActionRecord[] = [
+        mkAction('SB', 'fold'),
+        mkAction('BB', 'fold'),
+        mkAction('UTG', 'all-in', 50),
+        mkAction('MP', 'all-in', 100),
+      ];
+      const players: PlayerState[] = [
+        mkPlayer('UTG', 0, true, true),  // contributed 50
+        mkPlayer('MP', 0, true, true),   // contributed 100
+        mkPlayer('SB', 100, false),
+        mkPlayer('BB', 100, false),
+      ];
+      const pots = calculateSidePots(actions, players);
+
+      // 2 unique active levels: [50, 100]
+      expect(pots.length).toBe(2);
+
+      // Main pot (level 50): SB(0.5) + BB(1) + UTG(50) + MP(50) = 101.5
+      expect(pots[0].amount).toBe(101.5);
+      expect(pots[0].eligiblePositions).toContain('UTG');
+      expect(pots[0].eligiblePositions).toContain('MP');
+
+      // Side pot (level 100): MP excess (100-50) = 50
+      expect(pots[1].amount).toBe(50);
+      expect(pots[1].eligiblePositions).toEqual(['MP']);
+
+      // Total = 101.5 + 50 = 151.5 = 0.5 + 1 + 50 + 100
+      expect(pots.reduce((s, p) => s + p.amount, 0)).toBe(151.5);
+    });
+
+    it('3人オールイン（全異スタック）: 30BB vs 70BB vs 150BB', () => {
+      // UTG(30BB) all-in, MP(70BB) all-in, CO(150BB) all-in
+      // STACK-RULE-001: initialStacksでスタック明示（デフォルト100BBを超える場合は必須）
+      const initialStacks = new Map<string, number>([
+        ['UTG', 30], ['MP', 70], ['CO', 150], ['SB', 100], ['BB', 100],
+      ]);
+      const actions: ActionRecord[] = [
+        mkAction('SB', 'fold'),
+        mkAction('BB', 'fold'),
+        mkAction('UTG', 'all-in', 30),
+        mkAction('MP', 'all-in', 70),
+        mkAction('CO', 'all-in', 150),
+      ];
+      const players: PlayerState[] = [
+        mkPlayer('UTG', 0, true, true),
+        mkPlayer('MP', 0, true, true),
+        mkPlayer('CO', 0, true, true),
+        mkPlayer('SB', 100, false),
+        mkPlayer('BB', 100, false),
+      ];
+      const pots = calculateSidePots(actions, players, initialStacks);
+
+      // 3 unique active levels: [30, 70, 150]
+      expect(pots.length).toBe(3);
+
+      // Main (level 30): SB(0.5)+BB(1)+UTG(30)+MP(30)+CO(30) = 91.5
+      expect(pots[0].amount).toBe(91.5);
+      expect(pots[0].eligiblePositions.length).toBe(3);
+
+      // Side1 (level 70): MP(70-30)+CO(70-30) = 80
+      expect(pots[1].amount).toBe(80);
+      expect(pots[1].eligiblePositions.length).toBe(2);
+      expect(pots[1].eligiblePositions).not.toContain('UTG');
+
+      // Side2 (level 150): CO(150-70) = 80
+      expect(pots[2].amount).toBe(80);
+      expect(pots[2].eligiblePositions).toEqual(['CO']);
+
+      // Total = 91.5 + 80 + 80 = 251.5 = 0.5+1+30+70+150
+      expect(pots.reduce((s, p) => s + p.amount, 0)).toBe(251.5);
+    });
+
+    it('4人オールイン（全異スタック）: 20/50/100/200BB', () => {
+      // STACK-RULE-001: initialStacksでスタック明示
+      const initialStacks = new Map<string, number>([
+        ['UTG', 20], ['MP', 50], ['CO', 100], ['BTN', 200], ['SB', 100], ['BB', 100],
+      ]);
+      const actions: ActionRecord[] = [
+        mkAction('SB', 'fold'),
+        mkAction('BB', 'fold'),
+        mkAction('UTG', 'all-in', 20),
+        mkAction('MP', 'all-in', 50),
+        mkAction('CO', 'all-in', 100),
+        mkAction('BTN', 'all-in', 200),
+      ];
+      const players: PlayerState[] = [
+        mkPlayer('UTG', 0, true, true),
+        mkPlayer('MP', 0, true, true),
+        mkPlayer('CO', 0, true, true),
+        mkPlayer('BTN', 0, true, true),
+        mkPlayer('SB', 100, false),
+        mkPlayer('BB', 100, false),
+      ];
+      const pots = calculateSidePots(actions, players, initialStacks);
+
+      // 4 unique active levels: [20, 50, 100, 200]
+      expect(pots.length).toBe(4);
+
+      // Main (level 20): SB(0.5)+BB(1)+UTG(20)+MP(20)+CO(20)+BTN(20) = 81.5
+      expect(pots[0].amount).toBe(81.5);
+      expect(pots[0].eligiblePositions.length).toBe(4);
+
+      // Side1 (level 50): MP(30)+CO(30)+BTN(30) = 90
+      expect(pots[1].amount).toBe(90);
+      expect(pots[1].eligiblePositions.length).toBe(3);
+
+      // Side2 (level 100): CO(50)+BTN(50) = 100
+      expect(pots[2].amount).toBe(100);
+      expect(pots[2].eligiblePositions.length).toBe(2);
+
+      // Side3 (level 200): BTN(100) = 100
+      expect(pots[3].amount).toBe(100);
+      expect(pots[3].eligiblePositions).toEqual(['BTN']);
+
+      // Total = 81.5+90+100+100 = 371.5 = 0.5+1+20+50+100+200
+      expect(pots.reduce((s, p) => s + p.amount, 0)).toBe(371.5);
+    });
+
+    it('オールイン+アクティブプレイヤー混在: 50BBオールイン + 2人ベット継続', () => {
+      // UTG(50BB) all-in 50, MP(100BB) calls 50, CO(100BB) calls 50
+      // MP and CO still have stack → no side pot between equal contributors
+      const actions: ActionRecord[] = [
+        mkAction('SB', 'fold'),
+        mkAction('BB', 'fold'),
+        mkAction('UTG', 'all-in', 50),
+        mkAction('MP', 'call'),
+        mkAction('CO', 'call'),
+      ];
+      const players: PlayerState[] = [
+        mkPlayer('UTG', 0, true, true),   // contributed 50
+        mkPlayer('MP', 50, true),          // contributed 50
+        mkPlayer('CO', 50, true),          // contributed 50
+        mkPlayer('SB', 100, false),
+        mkPlayer('BB', 100, false),
+      ];
+      const pots = calculateSidePots(actions, players);
+
+      // All active players contributed 50 → 1 unique level → 1 pot
+      expect(pots.length).toBe(1);
+
+      // Main pot: SB(0.5)+BB(1)+UTG(50)+MP(50)+CO(50) = 151.5
+      expect(pots[0].amount).toBe(151.5);
+      expect(pots[0].eligiblePositions.length).toBe(3);
+    });
+
+    it('全員同額オールイン: 全員100BB → サイドポットなし', () => {
+      // All 3 players go all-in for 100BB each
+      const actions: ActionRecord[] = [
+        mkAction('SB', 'fold'),
+        mkAction('BB', 'fold'),
+        mkAction('UTG', 'all-in', 100),
+        mkAction('MP', 'all-in', 100),
+        mkAction('CO', 'all-in', 100),
+      ];
+      const players: PlayerState[] = [
+        mkPlayer('UTG', 0, true, true),
+        mkPlayer('MP', 0, true, true),
+        mkPlayer('CO', 0, true, true),
+        mkPlayer('SB', 100, false),
+        mkPlayer('BB', 100, false),
+      ];
+      const pots = calculateSidePots(actions, players);
+
+      // All same contribution → 1 pot only (no side pots)
+      expect(pots.length).toBe(1);
+
+      // Main pot: SB(0.5)+BB(1)+UTG(100)+MP(100)+CO(100) = 301.5
+      expect(pots[0].amount).toBe(301.5);
+      expect(pots[0].eligiblePositions.length).toBe(3);
+    });
+
+    it('per-player initialStacks対応: 異スタック設定', () => {
+      // STACK-RULE-001: initialStacksで個別スタック指定
+      const initialStacks = new Map<string, number>([
+        ['UTG', 50],
+        ['MP', 100],
+        ['CO', 100],
+        ['SB', 100],
+        ['BB', 100],
+      ]);
+      const actions: ActionRecord[] = [
+        mkAction('SB', 'fold'),
+        mkAction('BB', 'fold'),
+        mkAction('UTG', 'all-in', 50),
+        mkAction('MP', 'all-in', 100),
+      ];
+      const players: PlayerState[] = [
+        mkPlayer('UTG', 0, true, true),
+        mkPlayer('MP', 0, true, true),
+        mkPlayer('SB', 100, false),
+        mkPlayer('BB', 100, false),
+      ];
+      const pots = calculateSidePots(actions, players, initialStacks);
+
+      expect(pots.length).toBe(2);
+      // Main: capped at UTG's 50 per player → SB(0.5)+BB(1)+UTG(50)+MP(50) = 101.5
+      expect(pots[0].amount).toBe(101.5);
+      // Side: MP excess up to 100 → (100-50) = 50
+      expect(pots[1].amount).toBe(50);
+    });
+  });
+
   describe('BUG-9: チョップ時のポット計算（ブラインド超過キャップ）', () => {
     it('BB all-in preflop: contribution capped at 100', () => {
       // BBがプリフロでオールイン（100BB）、SBコール

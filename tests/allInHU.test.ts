@@ -115,8 +115,9 @@ describe('BUG-16: ヘッズアップ+マルチウェイ オールインシナリ
       const actionNames = result.map(a => a.action);
 
       expect(actionNames).toContain('fold');
-      expect(actionNames).toContain('call'); // stack === callAmount → call扱い（新仕様）
-      expect(actionNames).not.toContain('all-in'); // call-all-inはcallとして返る
+      // BUG-46: stack === callAmount → All-in表示（TH準拠: 残スタック全額投入=オールイン）
+      expect(actionNames).toContain('all-in');
+      expect(actionNames).not.toContain('call');
     });
   });
 

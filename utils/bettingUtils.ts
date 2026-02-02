@@ -253,11 +253,15 @@ export function getAvailableActions(
   if (!hasBet) {
     available.push({ action: 'check' });
   } else {
-    // BUG-20: callAmountをアクション履歴から計算（lastBetに依存しない）
-    // stack >= callAmount: call可能（stack===callAmountはcall-all-in = callとして扱う）
+    // BUG-46: callAmountをアクション履歴から計算（lastBetに依存しない）
+    // stack > callAmount: call可能
+    // stack === callAmount: All-in（残スタック全額投入=TH準拠オールイン）
     // stack < callAmount: call不可（ショートオールインは別途処理）
-    if (callAmount > 0 && player.stack >= callAmount) {
+    if (callAmount > 0 && player.stack > callAmount) {
       available.push({ action: 'call' });
+    } else if (callAmount > 0 && player.stack === callAmount) {
+      // BUG-46: コール額が残スタックと同額 → All-in表示
+      available.push({ action: 'all-in' });
     }
   }
 
@@ -292,11 +296,13 @@ export function getAvailableActions(
       }
     }
 
-    // オールインは常に追加（スタックが0より大きい場合）
-    available.push({ action: 'all-in' });
+    // BUG-46: all-inが既に追加済み（callAmount===stack）でなければ追加
+    if (!available.some(a => a.action === 'all-in')) {
+      available.push({ action: 'all-in' });
+    }
   } else if (isRestricted && player.stack > 0) {
     // BUG-20: 制限中のショートオールイン（stack < callAmount: ベット額に届かない場合のみ）
-    // stack === callAmount の場合はL258でcallとして処理済み
+    // BUG-46: stack === callAmount の場合はall-inとして上で処理済み
     if (hasBet && callAmount > 0 && player.stack < callAmount) {
       available.push({ action: 'all-in' });
     }
