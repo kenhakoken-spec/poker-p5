@@ -58,10 +58,16 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
   const [editingMemoId, setEditingMemoId] = useState<string | null>(null);
   const [memoText, setMemoText] = useState('');
   const [toast, setToast] = useState<string | null>(null);
+  const [isAndroid, setIsAndroid] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     setHistory(loadHistory());
+    // Z6-9: OS detection for Gemini link
+    const ua = navigator.userAgent;
+    setIsAndroid(/android/i.test(ua));
+    setIsIOS(/iphone|ipad|ipod/i.test(ua));
   }, []);
 
   // BUG-13: isActive prop変更時にlocalStorageから再読み込み
@@ -120,6 +126,39 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
     } catch { /* ignore */ }
     setToast('Text selected — long press to copy');
     setTimeout(() => setToast(null), 3000);
+  };
+
+  // Z6-9: Modern clipboard API with fallback
+  const handleCopy = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setToast('Copied! Paste in Gemini to analyze');
+      setTimeout(() => setToast(null), 3000);
+    } catch {
+      // Fallback: execCommand
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-9999px';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        const ok = document.execCommand('copy');
+        if (ok) {
+          setToast('Copied! Paste in Gemini to analyze');
+          setTimeout(() => setToast(null), 3000);
+        } else {
+          setToast('Failed to copy');
+          setTimeout(() => setToast(null), 3000);
+        }
+      } catch {
+        setToast('Failed to copy');
+        setTimeout(() => setToast(null), 3000);
+      } finally {
+        document.body.removeChild(textarea);
+      }
+    }
   };
 
   return (
@@ -402,19 +441,26 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
                               aria-hidden="true"
                               style={{ position: 'fixed', left: '-9999px', opacity: 0 }}
                             />
+                            {/* Copy button */}
                             <motion.button
                               type="button"
-                              className="px-3 py-1.5 bg-p5-red text-white font-bold text-xs border border-white/30"
+                              className="px-3 py-1.5 bg-gray-700 text-white font-bold text-xs border border-white/20"
                               style={{ clipPath: 'polygon(4% 0%, 100% 0%, 96% 100%, 0% 100%)' }}
                               whileTap={{ scale: 0.95 }}
-                              onClick={handleSelectAndCopy}
+                              onClick={() => handleCopy(generateHandExport(hand))}
                             >
                               <span className="font-p5-en">Copy</span>
                             </motion.button>
+                            {/* Copy & Gemini button (Z6-9) */}
                             <a
-                              href="https://gemini.google.com/app"
-                              target="_blank"
+                              href={
+                                isAndroid
+                                  ? 'intent://gemini.google.com/app/new#Intent;scheme=https;package=com.google.android.apps.bard;S.browser_fallback_url=https%3A%2F%2Fgemini.google.com%2Fapp%2Fnew;end'
+                                  : 'https://gemini.google.com/app/new'
+                              }
+                              target={isIOS ? '_blank' : undefined}
                               rel="noopener noreferrer"
+                              onClick={() => handleCopy(generateHandExport(hand))}
                               style={{
                                 display: 'inline-block',
                                 padding: '6px 10px',
@@ -424,10 +470,11 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
                                 fontSize: '0.75rem',
                                 textDecoration: 'none',
                                 border: '1px solid rgba(255,255,255,0.3)',
+                                clipPath: 'polygon(4% 0%, 100% 0%, 96% 100%, 0% 100%)',
                               }}
                               className="font-p5-en"
                             >
-                              Open Gemini
+                              Copy & Gemini
                             </a>
                           </div>
                         </div>
