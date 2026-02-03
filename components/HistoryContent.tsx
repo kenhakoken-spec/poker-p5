@@ -221,7 +221,8 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
           </motion.button>
 
           {/* FEAT: Gemini personality dropdown */}
-          <div className="relative">
+          <div className="relative flex items-center gap-2">
+            <span className="text-xs text-gray-500 font-bold">Style:</span>
             <select
               value={personality}
               onChange={(e) => setPersonality(e.target.value as GeminiPersonality)}

@@ -20,7 +20,7 @@ export const GEMINI_PROMPTS: Record<GeminiPersonality, { label: string; prompt: 
     prompt: '相手の傾向を読み取り、エクスプロイト（搾取戦略）の観点から分析してください。相手のリーク、搾取ポイント、アジャストの提案をしてください。',
   },
   coach: {
-    label: 'Coach',
+    label: 'Strict Coach',
     prompt: '厳しいポーカーコーチとして、容赦なくミスを指摘してください。言い訳を許さず、改善すべきポイントを断定的に述べてください。良いプレイは簡潔に認め、悪いプレイには厳しく指摘してください。',
   },
 };
