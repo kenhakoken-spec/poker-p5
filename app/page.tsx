@@ -14,45 +14,16 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'history', label: 'HISTORY' },
 ];
 
-const BASE_WIDTH = 412;
-const BASE_HEIGHT = 915;
-
 function ScalingWrapper({ children }: { children: React.ReactNode }) {
-  const [dims, setDims] = useState({ scale: 1, offsetY: 0 });
-
-  useEffect(() => {
-    const update = () => {
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
-      const s = Math.min(vw / BASE_WIDTH, vh / BASE_HEIGHT);
-      const scaledH = BASE_HEIGHT * s;
-      const oy = Math.max(0, (vh - scaledH) / 2);
-      setDims({ scale: s, offsetY: oy });
-    };
-    update();
-    window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
-  }, []);
-
   return (
     <div
       style={{
         width: '100vw',
         height: '100dvh',
         overflow: 'hidden',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'flex-start',
       }}
     >
-      <div
-        className="scaling-container"
-        style={{
-          transform: `scale(${dims.scale})`,
-          transformOrigin: 'top center',
-          marginTop: `${dims.offsetY}px`,
-        }}
-      >
+      <div className="scaling-container">
         {children}
       </div>
     </div>

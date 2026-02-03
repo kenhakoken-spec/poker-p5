@@ -305,10 +305,10 @@ body::after {
   height: var(--app-height, 100vh) !important;
 }
 
-/* ScalingWrapper: 固定アスペクト比スケーリングコンテナ */
+/* ScalingWrapper: レスポンシブコンテナ（横幅ビューポートフル使用） */
 .scaling-container {
-  width: 412px;
-  height: 915px;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
 }
 
