@@ -214,6 +214,9 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
             whileTap={{ scale: 0.92 }}
             onClick={() => setFilterFav(f => !f)}
           >
+            <svg viewBox="0 0 16 16" className="w-3 h-3 inline-block mr-1" fill="currentColor">
+              <path d="M1 2h14l-5 6v5l-4 2V8z"/>
+            </svg>
             {filterFav ? '★ Favorites' : '☆ Favorites'}
           </motion.button>
 
@@ -321,11 +324,20 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
               return (
                 <motion.div
                   key={hand.id}
-                  className="border border-white/15 bg-black/80 overflow-hidden"
+                  className="border border-white/15 bg-black/80 overflow-hidden relative"
                   style={{ clipPath: 'polygon(1.5% 0%, 100% 0%, 98.5% 100%, 0% 100%)' }}
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.02 }}
+                  drag="x"
+                  dragConstraints={{ left: -150, right: 150 }}
+                  dragElastic={0.2}
+                  onDragEnd={(e, { offset }) => {
+                    if (Math.abs(offset.x) > 80) {
+                      deleteHand(hand.id);
+                    }
+                  }}
+                  whileDrag={{ scale: 0.98 }}
                 >
                   {/* Summary section */}
                   <div
@@ -401,8 +413,9 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
                       <button
                         className="text-red-600/50 hover:text-red-400 text-sm shrink-0 px-1"
                         onClick={e => { e.stopPropagation(); deleteHand(hand.id); }}
+                        aria-label="Delete hand"
                       >
-                        ×
+                        🗑
                       </button>
 
                       {/* Expand indicator */}
@@ -514,10 +527,8 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
                               </div>
                             ) : (
                               <div>
-                                {hand.memo ? (
+                                {hand.memo && (
                                   <p className="text-xs text-white/80 mb-1.5">{hand.memo}</p>
-                                ) : (
-                                  <p className="text-xs text-gray-500 italic mb-1.5">No memo</p>
                                 )}
                                 <button
                                   className="text-[11px] text-gray-600 hover:text-white transition-colors"

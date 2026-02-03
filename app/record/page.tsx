@@ -1497,7 +1497,7 @@ export default function RecordPage() {
           <textarea
             className="w-full bg-black border-2 border-p5-red/60 text-white text-sm p-3 rounded resize-none focus:border-p5-red focus:outline-none placeholder-gray-500"
             rows={2}
-            placeholder="Memo (location, opponent traits, thought process, etc.)"
+            placeholder="Memo (location, etc.)"
             value={memo}
             onChange={(e) => setMemo(e.target.value)}
             style={{ transform: 'skewX(-2deg)' }}
@@ -1520,7 +1520,7 @@ export default function RecordPage() {
         {/* UI-28: Next Hand ボタン — 保存して次のハンドを即開始 */}
         <motion.button
           type="button"
-          className="w-full max-w-xs py-3 mt-2 border-2 border-white/40 text-white/80 font-p5-en font-bold text-sm polygon-button relative z-10 bg-black/50"
+          className="w-auto max-w-[200px] px-6 py-3 mt-2 border-2 border-white/40 text-white/80 font-p5-en font-bold text-sm polygon-button relative z-10 bg-black/50"
           style={{ transform: 'skewX(-7deg)' }}
           whileTap={{ scale: 0.92 }}
           initial={{ opacity: 0, y: 20 }}
@@ -1687,7 +1687,7 @@ export default function RecordPage() {
               }
               if (isCurrent) {
                 return (
-                  <span key={p.position} className="inline-flex items-center gap-1">
+                  <span key={p.position} className="inline-flex items-center gap-1 justify-center">
                     <span className="font-p5-en font-black text-base bg-p5-red text-white px-3 py-1 rounded glow-red" style={{ transform: 'skewX(-5deg)' }}>
                       → {p.position}{isHero ? ' ★' : ''}
                     </span>
@@ -1697,7 +1697,7 @@ export default function RecordPage() {
               }
               if (isNext) {
                 return (
-                  <span key={p.position} className="inline-flex items-center gap-1">
+                  <span key={p.position} className="inline-flex items-center gap-1 justify-center">
                     <span className="font-p5-en font-bold text-sm text-p5-red border border-p5-red/50 px-2 py-0.5 rounded">
                       {p.position}
                     </span>
@@ -1707,7 +1707,7 @@ export default function RecordPage() {
                 );
               }
               return (
-                <span key={p.position} className="inline-flex items-center gap-1">
+                <span key={p.position} className="inline-flex items-center gap-1 justify-center">
                   <span className={`font-p5-en text-xs px-1 ${isAllIn ? 'text-amber-400 font-bold' : 'text-white/50'}`}>
                     {p.position}{isAllIn ? ' AI' : ''}
                   </span>
@@ -1810,7 +1810,7 @@ export default function RecordPage() {
             <>
               {/* UI-31: ポジション名を大きなバッジ + 色分けで明確表示 */}
               <div className="text-center mb-2">
-                <div className="inline-flex items-center gap-2">
+                <div className="inline-flex items-center gap-2 justify-center">
                   <span
                     className={`font-p5-en text-3xl sm:text-4xl font-black inline-block px-5 py-1 rounded ${
                       selectedPosition === heroPosition
