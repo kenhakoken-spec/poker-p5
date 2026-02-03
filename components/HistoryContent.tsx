@@ -173,26 +173,6 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
 
         {/* Controls */}
         <div className="flex items-center gap-2 mb-4">
-          {history.length > 0 && (
-            <a
-              href="https://gemini.google.com/app"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                display: 'inline-block',
-                padding: '6px 10px',
-                background: '#D50000',
-                color: '#fff',
-                fontWeight: 'bold',
-                fontSize: '0.75rem',
-                textDecoration: 'none',
-                border: '1px solid rgba(255,255,255,0.3)',
-              }}
-              className="font-p5-en"
-            >
-              Open Gemini
-            </a>
-          )}
           <motion.button
             className={`px-4 py-1.5 font-bold text-xs border ${
               filterFav
