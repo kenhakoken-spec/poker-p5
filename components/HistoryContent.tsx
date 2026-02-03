@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { loadHistory, saveHistory } from '@/utils/storage';
 import { generateHandExport, generateBatchExport, type GeminiPersonality, GEMINI_PROMPTS } from '@/utils/gemini';
+import { generateXPostText } from '@/utils/xpost';
 import { calculateCurrentPot } from '@/utils/potUtils';
 import type { Hand, ActionRecord } from '@/types/poker';
 
@@ -585,6 +586,31 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
                               className="font-p5-en"
                             >
                               Copy & Gemini
+                            </a>
+                            {/* X (Grok) post button */}
+                            <a
+                              href={generateXPostText(hand)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                padding: '6px 10px',
+                                background: '#000',
+                                color: '#fff',
+                                fontWeight: 'bold',
+                                fontSize: '0.75rem',
+                                textDecoration: 'none',
+                                border: '1px solid rgba(255,255,255,0.3)',
+                                clipPath: 'polygon(4% 0%, 100% 0%, 96% 100%, 0% 100%)',
+                              }}
+                              className="font-p5-en"
+                            >
+                              <svg viewBox="0 0 24 24" className="w-4 h-4 mr-1" fill="currentColor">
+                                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                              </svg>
+                              Post X
                             </a>
                           </div>
                         </div>
