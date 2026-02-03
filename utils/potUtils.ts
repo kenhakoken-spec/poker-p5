@@ -192,9 +192,6 @@ export function getPotAfterEachAction(actions: ActionRecord[], initialStacks?: M
 /** 全ストリートを通じた各プレイヤーの累計投入額（SB/BBブラインド含む） */
 export function getTotalContributions(actions: ActionRecord[], initialStacks?: Map<string, number>): Map<string, number> {
   const contributions = new Map<string, number>();
-  // ブラインド初期値
-  contributions.set('SB', POKER_CONFIG.blinds.sb);
-  contributions.set('BB', POKER_CONFIG.blinds.bb);
 
   let currentBetByStreet = new Map<string, number>(); // street -> currentBet
   let contribByStreet = new Map<string, Map<string, number>>(); // street -> position -> contribution

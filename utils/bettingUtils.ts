@@ -41,7 +41,6 @@ export function getPreflopBetSizes(
     }
   } else {
     // ベット/レイズに対するアクション: 2x, 3x のみ（オールインは別途追加）
-    const minRaise = calculateMinRaise([], 'preflop', lastBet);
     const twoX = lastBet * 2;
     const threeX = lastBet * 3;
     
