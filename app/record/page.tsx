@@ -136,7 +136,8 @@ export default function RecordPage() {
   /** UI-6: メモ */
   const [memo, setMemo] = useState('');
 
-  // UI-53 + UI-58: 全画面でhtml/bodyのスクロールを完全禁止（ヒストリーは別ルート）
+  // UI-53 + UI-58 + IMP-E-002: 全画面でhtml/bodyのスクロールを完全禁止（ヒストリーは別ルート）
+  // IMP-E-002: マウント時1回のみで十分（step変化での再実行は不要）
   useEffect(() => {
     document.documentElement.style.overflow = 'hidden';
     document.body.style.overflow = 'hidden';
@@ -144,7 +145,7 @@ export default function RecordPage() {
       document.documentElement.style.overflow = '';
       document.body.style.overflow = '';
     };
-  }, [step]);
+  }, []);
 
   // Browser back: intercept popstate to use internal back logic instead of page navigation
   useEffect(() => {
@@ -157,16 +158,23 @@ export default function RecordPage() {
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
-  /** BUG-19 + BUG-47: Push step to history stack with state snapshot */
+  /** BUG-19 + BUG-47 + IMP-E-001: Push step to history stack with state snapshot (max 30 entries) */
   const pushStep = (newStep: Step) => {
     const { hand, gameState: gs } = getLatestState();
-    setStepHistory(prev => [...prev, {
-      step: newStep,
-      selectedPosition: selectedPositionRef.current,
-      pendingBoardStreet: pendingBoardStreetRef.current,
-      handSnapshot: hand ? structuredClone(hand) : null,
-      gameStateSnapshot: gs ? structuredClone(gs) : null,
-    }]);
+    setStepHistory(prev => {
+      const next = [...prev, {
+        step: newStep,
+        selectedPosition: selectedPositionRef.current,
+        pendingBoardStreet: pendingBoardStreetRef.current,
+        handSnapshot: hand ? structuredClone(hand) : null,
+        gameStateSnapshot: gs ? structuredClone(gs) : null,
+      }];
+      // IMP-E-001: Limit history to 30 entries to reduce memory overhead
+      if (next.length > 30) {
+        next.shift();
+      }
+      return next;
+    });
     setStep(newStep);
     window.history.pushState({ step: newStep }, '');
   };
@@ -592,7 +600,10 @@ export default function RecordPage() {
     );
   };
 
-  const handleFinish = (won: boolean, dynamicAmount?: number) => {
+  /** BUG-E-001/IMP-E-003: Unified memo saving logic */
+  const finishHandWithMemo = (won: boolean, dynamicAmount?: number) => {
+    // BUG-E-002: Fallback values (±10BB) are used only when dynamic calculation fails
+    // In normal flow, dynamicAmount is always provided from pot calculation
     const amount = dynamicAmount ?? (won ? 10 : -10);
     finishHand({ won, amount });
     // UI-12: memo をハンドのトップレベルフィールドとして localStorage に直接保存
@@ -610,6 +621,10 @@ export default function RecordPage() {
         // memo保存失敗（ハンド本体は保存済み）
       }
     }
+  };
+
+  const handleFinish = (won: boolean, dynamicAmount?: number) => {
+    finishHandWithMemo(won, dynamicAmount);
     // BUG-7: タブ切替でヒストリーに遷移（router.pushだとタブナビから外れる）
     window.dispatchEvent(new CustomEvent('switchTab', { detail: 'history' }));
   };
@@ -1485,21 +1500,9 @@ export default function RecordPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.75 }}
           onClick={() => {
-            // 現在のハンドを保存
-            finishHand({ won: heroWon, amount: displayAmount });
-            if (memo) {
-              try {
-                const raw = localStorage.getItem('poker3_history');
-                if (raw) {
-                  const hands = JSON.parse(raw);
-                  if (hands.length > 0) {
-                    hands[hands.length - 1].memo = memo;
-                    localStorage.setItem('poker3_history', JSON.stringify(hands));
-                  }
-                }
-              } catch { /* memo save failure */ }
-            }
-            // タブ切替せず次のハンドへ
+            // BUG-E-001/IMP-E-003: Use unified memo saving logic
+            finishHandWithMemo(heroWon, displayAmount);
+            // BUG-E-003: Reset all UI state (including flowError and showShowdownSheet)
             setStep('hero');
             setStepHistory([{ step: 'hero', selectedPosition: null, pendingBoardStreet: null, handSnapshot: null, gameStateSnapshot: null }]);
             setSelectedPosition(null);
@@ -1508,9 +1511,12 @@ export default function RecordPage() {
             setOpponentShowSlider(false);
             setWhoOpenSelectedPosition(null);
             setSelectedWinner(null);
+            setFlowError(null);
+            setPendingBoardStreet(null);
             setPotWinnerMap(new Map());
             setConfirmedPotWinners([]);
             setMemo('');
+            setShowShowdownSheet(false);
           }}
         >
           NEXT HAND
