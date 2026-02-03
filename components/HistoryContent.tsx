@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { loadHistory, saveHistory } from '@/utils/storage';
-import { generateHandExport } from '@/utils/gemini';
+import { generateHandExport, generateBatchExport, type GeminiPersonality, GEMINI_PROMPTS } from '@/utils/gemini';
 import { calculateCurrentPot } from '@/utils/potUtils';
 import type { Hand, ActionRecord } from '@/types/poker';
 
@@ -61,6 +61,10 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
   const [isAndroid, setIsAndroid] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // FEAT: Gemini personality selection
+  const [personality, setPersonality] = useState<GeminiPersonality>('neutral');
+  // FEAT: Batch selection for multiple hands
+  const [selectedHands, setSelectedHands] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     setHistory(loadHistory());
@@ -161,6 +165,32 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
     }
   };
 
+  // FEAT: Toggle hand selection for batch operations
+  const toggleHandSelection = (handId: string) => {
+    setSelectedHands(prev => {
+      const next = new Set(prev);
+      if (next.has(handId)) {
+        next.delete(handId);
+      } else {
+        next.add(handId);
+      }
+      return next;
+    });
+  };
+
+  // FEAT: Clear all selections
+  const clearAllSelections = () => {
+    setSelectedHands(new Set());
+  };
+
+  // FEAT: Copy all selected hands
+  const handleCopyAll = async () => {
+    const selected = history.filter(h => selectedHands.has(h.id));
+    if (selected.length === 0) return;
+    const batchText = generateBatchExport(selected, personality);
+    await handleCopy(batchText);
+  };
+
   return (
     <main className="h-full overflow-y-auto scroll-smooth history-scroll bg-black text-white p-4 sm:p-6" data-testid="history-container">
       <div className="max-w-lg mx-auto">
@@ -172,7 +202,7 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
         </h1>
 
         {/* Controls */}
-        <div className="flex items-center gap-2 mb-4">
+        <div className="flex items-center gap-2 mb-4 flex-wrap">
           <motion.button
             className={`px-4 py-1.5 font-bold text-xs border ${
               filterFav
@@ -186,10 +216,84 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
           >
             {filterFav ? '★ Favorites' : '☆ Favorites'}
           </motion.button>
+
+          {/* FEAT: Gemini personality dropdown */}
+          <div className="relative">
+            <select
+              value={personality}
+              onChange={(e) => setPersonality(e.target.value as GeminiPersonality)}
+              className="px-3 py-1.5 bg-gray-800/90 border border-white/20 text-white text-xs font-bold appearance-none pr-8 cursor-pointer hover:bg-gray-700/90 transition-colors focus:outline-none focus:border-p5-red"
+              style={{ clipPath: 'polygon(2% 0%, 100% 0%, 98% 100%, 0% 100%)' }}
+            >
+              {(Object.keys(GEMINI_PROMPTS) as GeminiPersonality[]).map(key => (
+                <option key={key} value={key}>
+                  {GEMINI_PROMPTS[key].label}
+                </option>
+              ))}
+            </select>
+            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-white/50 text-xs pointer-events-none">▼</span>
+          </div>
+
           <span className="text-xs text-gray-600 ml-auto" data-testid="history-hand-count">
             {filtered.length} hands
           </span>
         </div>
+
+        {/* FEAT: Batch operation area (visible when 1+ hands selected) */}
+        {selectedHands.size > 0 && (
+          <motion.div
+            className="mb-3 p-3 bg-gray-800/50 border border-p5-red/50 rounded-lg"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+          >
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm font-bold text-white">
+                {selectedHands.size} selected
+              </span>
+              <motion.button
+                type="button"
+                className="px-3 py-1.5 bg-gray-700 text-white font-bold text-xs border border-white/20"
+                style={{ clipPath: 'polygon(4% 0%, 100% 0%, 96% 100%, 0% 100%)' }}
+                whileTap={{ scale: 0.95 }}
+                onClick={handleCopyAll}
+              >
+                <span className="font-p5-en">Copy All</span>
+              </motion.button>
+              <a
+                href={
+                  isAndroid
+                    ? 'intent://gemini.google.com/app/new#Intent;scheme=https;package=com.google.android.apps.bard;S.browser_fallback_url=https%3A%2F%2Fgemini.google.com%2Fapp%2Fnew;end'
+                    : 'https://gemini.google.com/app/new'
+                }
+                target={isIOS ? '_blank' : undefined}
+                rel="noopener noreferrer"
+                onClick={handleCopyAll}
+                style={{
+                  display: 'inline-block',
+                  padding: '6px 12px',
+                  background: '#D50000',
+                  color: '#fff',
+                  fontWeight: 'bold',
+                  fontSize: '0.75rem',
+                  textDecoration: 'none',
+                  border: '1px solid rgba(255,255,255,0.3)',
+                  clipPath: 'polygon(4% 0%, 100% 0%, 96% 100%, 0% 100%)',
+                }}
+                className="font-p5-en"
+              >
+                Copy All & Gemini
+              </a>
+              <button
+                type="button"
+                className="text-xs text-gray-400 hover:text-white ml-auto"
+                onClick={clearAllSelections}
+              >
+                Clear All
+              </button>
+            </div>
+          </motion.div>
+        )}
 
         {/* List */}
         {filtered.length === 0 ? (
@@ -231,6 +335,20 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
                   >
                     {/* Line 1: core info + cards */}
                     <div className="flex items-center gap-1.5">
+                      {/* FEAT: Checkbox for batch selection */}
+                      <label
+                        className="flex items-center justify-center shrink-0 cursor-pointer"
+                        style={{ minWidth: '20px', minHeight: '44px' }}
+                        onClick={e => e.stopPropagation()}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedHands.has(hand.id)}
+                          onChange={() => toggleHandSelection(hand.id)}
+                          className="w-4 h-4 cursor-pointer accent-p5-red"
+                        />
+                      </label>
+
                       {/* Favorite */}
                       <button
                         className={`text-base shrink-0 ${hand.favorite ? 'text-yellow-400' : 'text-gray-700 hover:text-gray-500'}`}
@@ -417,7 +535,7 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
                               ref={textareaRef}
                               readOnly
                               tabIndex={-1}
-                              value={generateHandExport(hand)}
+                              value={generateHandExport(hand, personality)}
                               aria-hidden="true"
                               style={{ position: 'fixed', left: '-9999px', opacity: 0 }}
                             />
@@ -427,7 +545,7 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
                               className="px-3 py-1.5 bg-gray-700 text-white font-bold text-xs border border-white/20"
                               style={{ clipPath: 'polygon(4% 0%, 100% 0%, 96% 100%, 0% 100%)' }}
                               whileTap={{ scale: 0.95 }}
-                              onClick={() => handleCopy(generateHandExport(hand))}
+                              onClick={() => handleCopy(generateHandExport(hand, personality))}
                             >
                               <span className="font-p5-en">Copy</span>
                             </motion.button>
@@ -440,7 +558,7 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
                               }
                               target={isIOS ? '_blank' : undefined}
                               rel="noopener noreferrer"
-                              onClick={() => handleCopy(generateHandExport(hand))}
+                              onClick={() => handleCopy(generateHandExport(hand, personality))}
                               style={{
                                 display: 'inline-block',
                                 padding: '6px 10px',

@@ -2,8 +2,31 @@ import type { History, Hand, ActionRecord, Street } from '@/types/poker';
 import { loadHistory } from './storage';
 import { calculateCurrentPot, getPotAfterEachAction } from './potUtils';
 
-const GEMINI_PROMPT_SINGLE =
-  '以下のポーカーハンド履歴を分析してください。プレイの良かった点と改善点を教えてください。';
+// FEAT: Gemini personality types for analysis
+export type GeminiPersonality = 'neutral' | 'gto' | 'exploit' | 'coach';
+
+// FEAT: Personality-based prompts for Gemini analysis
+export const GEMINI_PROMPTS: Record<GeminiPersonality, { label: string; prompt: string }> = {
+  neutral: {
+    label: 'Neutral',
+    prompt: '以下のポーカーハンド履歴を分析してください。プレイの良かった点と改善点を教えてください。',
+  },
+  gto: {
+    label: 'GTO',
+    prompt: 'GTO（ゲーム理論最適）の観点から、各ストリートのアクションを分析してください。レンジ構成、ベットサイズの適切さ、ポジション別の最適戦略との乖離を指摘してください。',
+  },
+  exploit: {
+    label: 'Exploit',
+    prompt: '相手の傾向を読み取り、エクスプロイト（搾取戦略）の観点から分析してください。相手のリーク、搾取ポイント、アジャストの提案をしてください。',
+  },
+  coach: {
+    label: 'Coach',
+    prompt: '厳しいポーカーコーチとして、容赦なくミスを指摘してください。言い訳を許さず、改善すべきポイントを断定的に述べてください。良いプレイは簡潔に認め、悪いプレイには厳しく指摘してください。',
+  },
+};
+
+// Legacy: Keep for backward compatibility
+const GEMINI_PROMPT_SINGLE = GEMINI_PROMPTS.neutral.prompt;
 
 /** TH準拠の1アクション行（ストリート・ポジション・アクション・額・その時点のポット） */
 export interface THActionRow {
@@ -38,7 +61,7 @@ ${JSON.stringify(history, null, 2)}`;
 }
 
 // 単一ハンドをGemini用テキストに（プロンプト＋TH準拠JSON）
-export function generateHandExport(hand: Hand): string {
+export function generateHandExport(hand: Hand, personality: GeminiPersonality = 'neutral'): string {
   const thActions = handToTHActions(hand);
   const handForExport = {
     id: hand.id,
@@ -55,7 +78,37 @@ export function generateHandExport(hand: Hand): string {
     initialStacks: hand.initialStacks ?? undefined,
     playerAttributes: hand.playerAttributes ?? undefined,
   };
-  return `${GEMINI_PROMPT_SINGLE}\n\n${JSON.stringify(handForExport, null, 2)}`;
+  const prompt = GEMINI_PROMPTS[personality].prompt;
+  return `${prompt}\n\n${JSON.stringify(handForExport, null, 2)}`;
+}
+
+// FEAT: Generate batch export for multiple hands
+export function generateBatchExport(hands: Hand[], personality: GeminiPersonality = 'neutral'): string {
+  const handsForExport = hands.map(hand => {
+    const thActions = handToTHActions(hand);
+    return {
+      id: hand.id,
+      date: hand.date,
+      heroPosition: hand.heroPosition,
+      heroHand: hand.heroHand,
+      board: hand.board,
+      winnerPosition: hand.winnerPosition,
+      showdownHands: hand.showdownHands,
+      result: hand.result,
+      notes: hand.notes,
+      finalPot: calculateCurrentPot(hand.actions),
+      actions: thActions,
+      initialStacks: hand.initialStacks ?? undefined,
+      playerAttributes: hand.playerAttributes ?? undefined,
+    };
+  });
+
+  const batchData = {
+    prompt: GEMINI_PROMPTS[personality].prompt,
+    hands: handsForExport,
+  };
+
+  return JSON.stringify(batchData, null, 2);
 }
 
 // BUG-18: 同期的コピー（execCommand使用、非同期API不使用）
