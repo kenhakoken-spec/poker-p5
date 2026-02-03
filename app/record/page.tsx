@@ -158,6 +158,27 @@ export default function RecordPage() {
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
+  // Auto-assign pots with only one eligible player (single-eligible pot auto-award)
+  useEffect(() => {
+    if (step === 'winner' && gameState?.sidePots) {
+      const autoAssignedPots = new Map<number, Position[]>();
+      gameState.sidePots.forEach((pot, idx) => {
+        if (pot.eligiblePositions.length === 1) {
+          autoAssignedPots.set(idx, pot.eligiblePositions);
+        }
+      });
+      if (autoAssignedPots.size > 0) {
+        setPotWinnerMap(prev => {
+          const next = new Map(prev);
+          autoAssignedPots.forEach((winners, idx) => {
+            next.set(idx, winners);
+          });
+          return next;
+        });
+      }
+    }
+  }, [step, gameState?.sidePots]);
+
   /** BUG-19 + BUG-47 + IMP-E-001: Push step to history stack with state snapshot (max 30 entries) */
   const pushStep = (newStep: Step) => {
     const { hand, gameState: gs } = getLatestState();
@@ -1160,42 +1181,48 @@ export default function RecordPage() {
               Select winner for each pot
             </h2>
             <div className="flex flex-col gap-3 max-w-sm mx-auto w-full overflow-auto max-h-[55vh] px-1">
-              {gameState.sidePots.map((pot, idx) => (
-                <div key={idx} className="border border-white/30 p-3 rounded bg-black/50">
-                  <p className="font-p5-en text-sm font-bold mb-2" style={{ transform: 'skewX(-5deg)' }}>
-                    Pot {idx + 1}: <span className="text-p5-red glow-red-text">{pot.amount} BB</span>
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {pot.eligiblePositions.map((pos) => {
-                      const isSelected = potWinnerMap.get(idx)?.includes(pos) ?? false;
-                      const isHero = pos === currentHand?.heroPosition;
-                      return (
-                        <P5Button
-                          key={pos}
-                          className={`px-4 py-2 font-bold text-sm polygon-button border-2 ${
-                            isSelected
-                              ? 'bg-p5-red border-p5-red text-white'
-                              : isHero
-                              ? 'bg-p5-red/20 border-p5-red text-white'
-                              : 'bg-black border-white text-white'
-                          }`}
-                          style={{ transform: 'skewX(-7deg)' }}
-                          onClick={() => {
-                            setPotWinnerMap(prev => {
-                              const next = new Map(prev);
-                              next.set(idx, [pos]);
-                              return next;
-                            });
-                          }}
-                        >
-                          {pos}
-                          {isHero && <span className="block text-[10px] font-bold">(You)</span>}
-                        </P5Button>
-                      );
-                    })}
+              {(() => {
+                const sidePots = gameState.sidePots;
+                return sidePots.filter(pot => pot.eligiblePositions.length >= 2).map((pot, originalIdx) => {
+                  // Find original index in full sidePots array
+                  const idx = sidePots.indexOf(pot);
+                return (
+                  <div key={idx} className="border border-white/30 p-3 rounded bg-black/50">
+                    <p className="font-p5-en text-sm font-bold mb-2" style={{ transform: 'skewX(-5deg)' }}>
+                      Pot {idx + 1}: <span className="text-p5-red glow-red-text">{pot.amount} BB</span>
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {pot.eligiblePositions.map((pos) => {
+                        const isSelected = potWinnerMap.get(idx)?.includes(pos) ?? false;
+                        const isHero = pos === currentHand?.heroPosition;
+                        return (
+                          <P5Button
+                            key={pos}
+                            className={`px-4 py-2 font-bold text-sm polygon-button border-2 ${
+                              isSelected
+                                ? 'bg-p5-red border-p5-red text-white'
+                                : isHero
+                                ? 'bg-p5-red/20 border-p5-red text-white'
+                                : 'bg-black border-white text-white'
+                            }`}
+                            style={{ transform: 'skewX(-7deg)' }}
+                            onClick={() => {
+                              setPotWinnerMap(prev => {
+                                const next = new Map(prev);
+                                next.set(idx, [pos]);
+                                return next;
+                              });
+                            }}
+                          >
+                            {pos}
+                            {isHero && <span className="block text-[10px] font-bold">(You)</span>}
+                          </P5Button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })})()}
             </div>
             {gameState.sidePots.every((_, i) => potWinnerMap.has(i)) && (
               <motion.button
@@ -1660,21 +1687,31 @@ export default function RecordPage() {
               }
               if (isCurrent) {
                 return (
-                  <span key={p.position} className="font-p5-en font-black text-base bg-p5-red text-white px-3 py-1 rounded glow-red" style={{ transform: 'skewX(-5deg)' }}>
-                    → {p.position}{isHero ? ' ★' : ''} <span className="text-[10px] font-normal text-white/60">({p.stack}bb)</span>
+                  <span key={p.position} className="inline-flex items-center gap-1">
+                    <span className="font-p5-en font-black text-base bg-p5-red text-white px-3 py-1 rounded glow-red" style={{ transform: 'skewX(-5deg)' }}>
+                      → {p.position}{isHero ? ' ★' : ''}
+                    </span>
+                    <span className="text-xs text-white/50">{p.stack}bb</span>
                   </span>
                 );
               }
               if (isNext) {
                 return (
-                  <span key={p.position} className="font-p5-en font-bold text-sm text-p5-red border border-p5-red/50 px-2 py-0.5 rounded">
-                    {p.position} <span className="text-[10px] font-normal text-gray-400">({p.stack}bb)</span> ›
+                  <span key={p.position} className="inline-flex items-center gap-1">
+                    <span className="font-p5-en font-bold text-sm text-p5-red border border-p5-red/50 px-2 py-0.5 rounded">
+                      {p.position}
+                    </span>
+                    <span className="text-xs text-white/50">{p.stack}bb</span>
+                    <span className="text-p5-red">›</span>
                   </span>
                 );
               }
               return (
-                <span key={p.position} className={`font-p5-en text-xs px-1 ${isAllIn ? 'text-amber-400 font-bold' : 'text-white/50'}`}>
-                  {p.position}<span className="text-[10px] font-normal text-gray-400">({p.stack}bb)</span>{isAllIn ? ' AI' : ''}
+                <span key={p.position} className="inline-flex items-center gap-1">
+                  <span className={`font-p5-en text-xs px-1 ${isAllIn ? 'text-amber-400 font-bold' : 'text-white/50'}`}>
+                    {p.position}{isAllIn ? ' AI' : ''}
+                  </span>
+                  <span className="text-xs text-white/50">{p.stack}bb</span>
                 </span>
               );
             })}
@@ -1773,21 +1810,24 @@ export default function RecordPage() {
             <>
               {/* UI-31: ポジション名を大きなバッジ + 色分けで明確表示 */}
               <div className="text-center mb-2">
-                <span
-                  className={`font-p5-en text-3xl sm:text-4xl font-black inline-block px-5 py-1 rounded ${
-                    selectedPosition === heroPosition
-                      ? 'bg-p5-red text-white glow-red'
-                      : 'bg-white/10 text-white border-2 border-white/40'
-                  }`}
-                  style={{ transform: 'skewX(-7deg)' }}
-                >
-                  {selectedPosition} <span className="text-base font-normal text-white/50">({gameState?.players.find(p => p.position === selectedPosition)?.stack ?? POKER_CONFIG.defaultStack}bb)</span>
-                  {/* UI-40: フロップ以降ヒーローアクション時にHERO表示 */}
-                  {selectedPosition === heroPosition && gameState?.street !== 'preflop' && (
-                    <span className="text-lg font-bold ml-2 opacity-80">HERO</span>
-                  )}
-                </span>
-                <span className="font-p5-en text-base text-gray-400 block mt-0.5" style={{ transform: 'skewX(-5deg)' }}>
+                <div className="inline-flex items-center gap-2">
+                  <span
+                    className={`font-p5-en text-3xl sm:text-4xl font-black inline-block px-5 py-1 rounded ${
+                      selectedPosition === heroPosition
+                        ? 'bg-p5-red text-white glow-red'
+                        : 'bg-white/10 text-white border-2 border-white/40'
+                    }`}
+                    style={{ transform: 'skewX(-7deg)' }}
+                  >
+                    {selectedPosition}
+                    {/* UI-40: フロップ以降ヒーローアクション時にHERO表示 */}
+                    {selectedPosition === heroPosition && gameState?.street !== 'preflop' && (
+                      <span className="text-lg font-bold ml-2 opacity-80">HERO</span>
+                    )}
+                  </span>
+                  <span className="text-base text-white/50">{gameState?.players.find(p => p.position === selectedPosition)?.stack ?? POKER_CONFIG.defaultStack}bb</span>
+                </div>
+                <span className="font-p5-en text-xs text-gray-400 block mt-0.5" style={{ transform: 'skewX(-5deg)' }}>
                   ACTION
                 </span>
               </div>

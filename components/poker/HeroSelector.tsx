@@ -172,6 +172,13 @@ export default function HeroSelector({ onSelect }: HeroSelectorProps) {
               >
                 Options
               </button>
+              <span className="text-xs text-white/50 font-bold">
+                {(() => {
+                  const stackValues = Array.from(initialStacks.values());
+                  const allSame = stackValues.every(v => v === stackValues[0]);
+                  return allSame ? `${stackValues[0]}BB` : 'Mixed';
+                })()}
+              </span>
               <button
                 type="button"
                 className="text-xs text-gray-400 hover:text-white"
