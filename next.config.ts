@@ -3,6 +3,10 @@ import path from 'path';
 
 const nextConfig: NextConfig = {
   /* config options here */
+  output: 'export',
+  images: {
+    unoptimized: true,
+  },
   webpack: (config) => {
     // パスエイリアスの設定
     // process.cwd() を使用してプロジェクトルートを取得
