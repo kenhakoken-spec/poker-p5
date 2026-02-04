@@ -223,7 +223,7 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
 
           {/* FEAT: Gemini personality dropdown */}
           <div className="relative flex items-center gap-2">
-            <span className="text-xs text-gray-500 font-bold">Style:</span>
+            <span className="text-xs text-gray-500 font-bold">Gemini Style</span>
             <select
               value={personality}
               onChange={(e) => setPersonality(e.target.value as GeminiPersonality)}
@@ -331,15 +331,6 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.02 }}
-                  drag="x"
-                  dragConstraints={{ left: -150, right: 150 }}
-                  dragElastic={0.2}
-                  onDragEnd={(e, { offset }) => {
-                    if (Math.abs(offset.x) > 80) {
-                      deleteHand(hand.id);
-                    }
-                  }}
-                  whileDrag={{ scale: 0.98 }}
                 >
                   {/* Summary section */}
                   <div
