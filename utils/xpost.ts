@@ -16,11 +16,25 @@ const STYLES = [
   'レトロな油絵',
 ];
 
+// 直前のスタイルを記憶（連続回避用）
+let lastStyle: string | null = null;
+
 /**
- * ランダムスタイルを1つ選ぶ
+ * ランダムスタイルを1つ選ぶ（直前と同じスタイルを避ける）
  */
 export function getRandomStyle(): string {
-  return STYLES[Math.floor(Math.random() * STYLES.length)];
+  // 配列が2つ以上あり、直前のスタイルがある場合は除外
+  if (STYLES.length >= 2 && lastStyle) {
+    const availableStyles = STYLES.filter(s => s !== lastStyle);
+    const selected = availableStyles[Math.floor(Math.random() * availableStyles.length)];
+    lastStyle = selected;
+    return selected;
+  }
+
+  // 初回または配列が1つのみの場合は普通にランダム選択
+  const selected = STYLES[Math.floor(Math.random() * STYLES.length)];
+  lastStyle = selected;
+  return selected;
 }
 
 /**
