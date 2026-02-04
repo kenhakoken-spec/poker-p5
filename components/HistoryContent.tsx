@@ -66,6 +66,8 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
   const [personality, setPersonality] = useState<GeminiPersonality>('neutral');
   // FEAT: Batch selection for multiple hands
   const [selectedHands, setSelectedHands] = useState<Set<string>>(new Set());
+  // FEAT: Pending delete with undo (mod5)
+  const [pendingDelete, setPendingDelete] = useState<{ids: string[], timer: NodeJS.Timeout} | null>(null);
 
   useEffect(() => {
     setHistory(loadHistory());
@@ -96,13 +98,41 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
     if (hand) updateHand(id, { favorite: !hand.favorite });
   };
 
-  const deleteHand = (id: string) => {
+  // MOD5: Confirm delete (actually remove from localStorage)
+  const confirmDelete = (ids: string[]) => {
     setHistory(prev => {
-      const next = prev.filter(h => h.id !== id);
+      const next = prev.filter(h => !ids.includes(h.id));
       saveHistory(next);
       return next;
     });
-    if (expandedId === id) setExpandedId(null);
+    ids.forEach(id => {
+      if (expandedId === id) setExpandedId(null);
+    });
+    setPendingDelete(null);
+    setToast(null);
+  };
+
+  // MOD5: Undo delete
+  const handleUndoDelete = () => {
+    if (pendingDelete) {
+      clearTimeout(pendingDelete.timer);
+      setPendingDelete(null);
+      setToast(null);
+    }
+  };
+
+  // MOD5: Delete hand with undo support
+  const deleteHand = (id: string) => {
+    // If there's already a pending delete, confirm it immediately
+    if (pendingDelete) {
+      clearTimeout(pendingDelete.timer);
+      confirmDelete(pendingDelete.ids);
+    }
+
+    // Set new pending delete with 3-second timer
+    const timer = setTimeout(() => confirmDelete([id]), 3000);
+    setPendingDelete({ ids: [id], timer });
+    setToast('Deleted');
   };
 
   const startEditMemo = (hand: Hand) => {
@@ -190,6 +220,24 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
     if (selected.length === 0) return;
     const batchText = generateBatchExport(selected, personality);
     await handleCopy(batchText);
+  };
+
+  // MOD6: Delete all selected hands with undo support
+  const handleDeleteAll = () => {
+    if (selectedHands.size === 0) return;
+
+    // If there's already a pending delete, confirm it immediately
+    if (pendingDelete) {
+      clearTimeout(pendingDelete.timer);
+      confirmDelete(pendingDelete.ids);
+    }
+
+    // Set new pending delete with 3-second timer
+    const ids = Array.from(selectedHands);
+    const timer = setTimeout(() => confirmDelete(ids), 3000);
+    setPendingDelete({ ids, timer });
+    setToast(`${ids.length} hand${ids.length > 1 ? 's' : ''} deleted`);
+    setSelectedHands(new Set());
   };
 
   return (
@@ -289,6 +337,15 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
               >
                 Copy All & Gemini
               </a>
+              <motion.button
+                type="button"
+                className="px-3 py-1.5 bg-red-600/80 hover:bg-red-600 text-white font-bold text-xs border border-white/20"
+                style={{ clipPath: 'polygon(4% 0%, 100% 0%, 96% 100%, 0% 100%)' }}
+                whileTap={{ scale: 0.95 }}
+                onClick={handleDeleteAll}
+              >
+                <span className="font-p5-en">🗑 Delete</span>
+              </motion.button>
               <button
                 type="button"
                 className="text-xs text-gray-400 hover:text-white ml-auto"
@@ -621,7 +678,7 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
       <AnimatePresence>
         {toast && (
           <motion.div
-            className="fixed bottom-6 left-1/2 z-50 px-6 py-3 bg-p5-red text-white font-bold text-sm border border-white/30"
+            className="fixed bottom-6 left-1/2 z-50 px-6 py-3 bg-p5-red text-white font-bold text-sm border border-white/30 flex items-center gap-3"
             style={{ clipPath: 'polygon(3% 0%, 100% 0%, 97% 100%, 0% 100%)', transform: 'translateX(-50%)' }}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -629,6 +686,16 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
             transition={{ duration: 0.2 }}
           >
             <span className="font-p5-en">{toast}</span>
+            {/* MOD5: Show Undo button when there's a pending delete */}
+            {pendingDelete && (
+              <button
+                onClick={handleUndoDelete}
+                className="px-3 py-1 bg-white/20 hover:bg-white/30 border border-white/40 font-bold text-xs transition-colors"
+                style={{ clipPath: 'polygon(5% 0%, 100% 0%, 95% 100%, 0% 100%)' }}
+              >
+                <span className="font-p5-en">Undo</span>
+              </button>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
