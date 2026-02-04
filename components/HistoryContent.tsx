@@ -334,12 +334,12 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
                 >
                   {/* Summary section */}
                   <div
-                    className="px-3 py-2 cursor-pointer select-none hover:bg-white/5 transition-colors"
+                    className="px-2 py-2 cursor-pointer select-none hover:bg-white/5 transition-colors"
                     data-testid={`hand-toggle-${hand.id}`}
                     onClick={() => setExpandedId(prev => prev === hand.id ? null : hand.id)}
                   >
                     {/* Line 1: core info + cards */}
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-3">
                       {/* FEAT: Checkbox for batch selection */}
                       <label
                         className="flex items-center justify-center shrink-0 cursor-pointer"
@@ -356,7 +356,8 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
 
                       {/* Favorite */}
                       <button
-                        className={`text-base shrink-0 ${hand.favorite ? 'text-yellow-400' : 'text-gray-700 hover:text-gray-500'}`}
+                        className={`text-base shrink-0 flex items-center justify-center ${hand.favorite ? 'text-yellow-400' : 'text-gray-700 hover:text-gray-500'}`}
+                        style={{ minWidth: '44px', minHeight: '44px' }}
                         onClick={e => { e.stopPropagation(); toggleFavorite(hand.id); }}
                       >
                         {hand.favorite ? '★' : '☆'}
@@ -404,7 +405,8 @@ export default function HistoryContent({ isActive }: { isActive?: boolean }) {
 
                       {/* Delete */}
                       <button
-                        className="text-red-600/50 hover:text-red-400 text-sm shrink-0 px-1"
+                        className="text-red-600/50 hover:text-red-400 text-sm shrink-0 flex items-center justify-center"
+                        style={{ minWidth: '44px', minHeight: '44px' }}
                         onClick={e => { e.stopPropagation(); deleteHand(hand.id); }}
                         aria-label="Delete hand"
                       >
