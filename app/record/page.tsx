@@ -158,6 +158,23 @@ export default function RecordPage() {
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
+  // テスト用state復元（開発環境のみ）
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      const restored = localStorage.getItem('poker3_test_state');
+      if (restored) {
+        try {
+          const { hand, gameState, step } = JSON.parse(restored);
+          restoreState(hand, gameState);
+          setStep(step);
+          localStorage.removeItem('poker3_test_state'); // 使い捨て
+        } catch (e) {
+          console.error('Test state restore failed:', e);
+        }
+      }
+    }
+  }, []);
+
   // Auto-assign pots with only one eligible player (single-eligible pot auto-award)
   useEffect(() => {
     if (step === 'winner' && gameState?.sidePots) {
